@@ -528,4 +528,171 @@ describe('SpeciesTotalsTable', () => {
 			);
 		});
 	});
+
+	describe('Counts/Biometrics toggle', () => {
+		const BIOMETRIC_HEADINGS = [
+			'Max weight (g)',
+			'Avg weight (g)',
+			'Min weight (g)',
+			'Median weight (g)',
+			'Max wing (mm)',
+			'Avg wing (mm)',
+			'Min wing (mm)',
+			'Median wing (mm)'
+		];
+		const AGE_BUCKET_HEADINGS = [
+			'New',
+			'Retrap',
+			'Pulli',
+			'Juv',
+			'Postjuv',
+			'Adult',
+			'Not aged'
+		];
+
+		const stats = [
+			makeStat({
+				species_name: 'Robin',
+				pullus_bird_count: 1,
+				max_weight: 21.37,
+				avg_weight: 18.2,
+				min_weight: 15.1,
+				median_weight: 17.9,
+				max_wing: 71,
+				avg_wing: 69.4,
+				min_wing: 67,
+				median_wing: 69
+			}),
+			makeStat({
+				species_name: 'Wren',
+				max_weight: null,
+				avg_weight: null,
+				min_weight: null,
+				median_weight: null,
+				max_wing: null,
+				avg_wing: null,
+				min_wing: null,
+				median_wing: null
+			})
+		];
+
+		function switchToBiometricsMode() {
+			fireEvent.click(screen.getByRole('radio', { name: 'Biometrics' }));
+		}
+
+		it('defaults to counts mode and renders the existing age-bucket column headers', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			const headings = getColumnHeaders().map((header) => header.textContent);
+			AGE_BUCKET_HEADINGS.forEach((heading) =>
+				expect(headings).toContain(heading)
+			);
+			BIOMETRIC_HEADINGS.forEach((heading) =>
+				expect(headings).not.toContain(heading)
+			);
+		});
+
+		it('renders the 8 biometric column headers in place of the age-bucket block when switched to biometrics mode', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			const headings = getColumnHeaders().map((header) => header.textContent);
+			BIOMETRIC_HEADINGS.forEach((heading) =>
+				expect(headings).toContain(heading)
+			);
+			AGE_BUCKET_HEADINGS.forEach((heading) =>
+				expect(headings).not.toContain(heading)
+			);
+		});
+
+		it("renders each row's biometric values from the underlying StatsCacheBySpeciesResult fields in biometrics mode", () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			expect(getCellTextByHeading('Max weight (g)', 0)).toBe('21.4');
+			expect(getCellTextByHeading('Avg weight (g)', 0)).toBe('18.2');
+			expect(getCellTextByHeading('Min weight (g)', 0)).toBe('15.1');
+			expect(getCellTextByHeading('Median weight (g)', 0)).toBe('17.9');
+			expect(getCellTextByHeading('Max wing (mm)', 0)).toBe('71');
+			expect(getCellTextByHeading('Avg wing (mm)', 0)).toBe('69.4');
+			expect(getCellTextByHeading('Min wing (mm)', 0)).toBe('67');
+			expect(getCellTextByHeading('Median wing (mm)', 0)).toBe('69');
+		});
+
+		it('renders an em dash for a null biometric value in biometrics mode', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			expect(getCellTextByHeading('Max weight (g)', 1)).toBe('—');
+		});
+
+		it('leaves the Species/Sessions/Encounters/Busiest session/Individuals columns and their values unaffected by switching modes', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			const unaffectedHeadings = [
+				'Species',
+				'Sessions',
+				'Encounters',
+				'Busiest session',
+				'Individuals'
+			];
+			const before = unaffectedHeadings.map((heading) =>
+				getCellTextByHeading(heading, 0)
+			);
+
+			switchToBiometricsMode();
+
+			const after = unaffectedHeadings.map((heading) =>
+				getCellTextByHeading(heading, 0)
+			);
+			expect(after).toEqual(before);
+		});
+
+		it('switches back to the age-bucket block when toggled back to counts mode', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			fireEvent.click(screen.getByRole('radio', { name: 'Counts' }));
+			const headings = getColumnHeaders().map((header) => header.textContent);
+			AGE_BUCKET_HEADINGS.forEach((heading) =>
+				expect(headings).toContain(heading)
+			);
+			BIOMETRIC_HEADINGS.forEach((heading) =>
+				expect(headings).not.toContain(heading)
+			);
+		});
+	});
+
+	describe('interaction between Counts/Biometrics and Aggregate by toggles', () => {
+		const stats = [makeStat({ species_name: 'Robin' })];
+
+		it('disables the Aggregate by toggle while biometrics mode is active', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Biometrics' }));
+			expect(
+				screen.getByRole('radio', { name: 'Bird' })
+			).toHaveProperty('disabled', true);
+			expect(
+				screen.getByRole('radio', { name: 'Encounter' })
+			).toHaveProperty('disabled', true);
+		});
+
+		it('re-enables the Aggregate by toggle when switched back to counts mode', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Biometrics' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'Counts' }));
+			expect(
+				screen.getByRole('radio', { name: 'Bird' })
+			).toHaveProperty('disabled', false);
+			expect(
+				screen.getByRole('radio', { name: 'Encounter' })
+			).toHaveProperty('disabled', false);
+		});
+
+		it("preserves the Aggregate by toggle's selected value across a round-trip through biometrics mode", () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
+
+			fireEvent.click(screen.getByRole('radio', { name: 'Biometrics' }));
+			fireEvent.click(screen.getByRole('radio', { name: 'Counts' }));
+
+			expect(
+				screen.getByRole('radio', { name: 'Encounter' })
+			).toHaveProperty('checked', true);
+		});
+	});
 });

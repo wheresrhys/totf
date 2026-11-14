@@ -64,7 +64,61 @@ describe('deriveSpeciesTotalsRow', () => {
 			juvsCount: 2,
 			postjuvCount: 1,
 			adultsCount: 1,
-			unknownAgeCount: 1
+			unknownAgeCount: 1,
+			max_weight: stat.max_weight,
+			avg_weight: stat.avg_weight,
+			min_weight: stat.min_weight,
+			median_weight: stat.median_weight,
+			max_wing: stat.max_wing,
+			avg_wing: stat.avg_wing,
+			min_wing: stat.min_wing,
+			median_wing: stat.median_wing
+		});
+	});
+
+	it('carries all 8 biometric fields straight through from the input row (#1430)', () => {
+		const stat = buildBySpeciesStatsRow({
+			max_weight: 21.3,
+			avg_weight: 18.2,
+			min_weight: 15.1,
+			median_weight: 17.9,
+			max_wing: 71,
+			avg_wing: 69.4,
+			min_wing: 67,
+			median_wing: 69
+		});
+		expect(deriveSpeciesTotalsRow(stat)).toMatchObject({
+			max_weight: 21.3,
+			avg_weight: 18.2,
+			min_weight: 15.1,
+			median_weight: 17.9,
+			max_wing: 71,
+			avg_wing: 69.4,
+			min_wing: 67,
+			median_wing: 69
+		});
+	});
+
+	it('passes a null biometric field through unchanged (species with no biometric-eligible encounters)', () => {
+		const stat = buildBySpeciesStatsRow({
+			max_weight: null,
+			avg_weight: null,
+			min_weight: null,
+			median_weight: null,
+			max_wing: null,
+			avg_wing: null,
+			min_wing: null,
+			median_wing: null
+		});
+		expect(deriveSpeciesTotalsRow(stat)).toMatchObject({
+			max_weight: null,
+			avg_weight: null,
+			min_weight: null,
+			median_weight: null,
+			max_wing: null,
+			avg_wing: null,
+			min_wing: null,
+			median_wing: null
 		});
 	});
 
@@ -120,7 +174,61 @@ describe('deriveSpeciesTotalsRowByEncounter', () => {
 			juvsCount: 3,
 			postjuvCount: 1,
 			adultsCount: 1,
-			unknownAgeCount: 0
+			unknownAgeCount: 0,
+			max_weight: stat.max_weight,
+			avg_weight: stat.avg_weight,
+			min_weight: stat.min_weight,
+			median_weight: stat.median_weight,
+			max_wing: stat.max_wing,
+			avg_wing: stat.avg_wing,
+			min_wing: stat.min_wing,
+			median_wing: stat.median_wing
+		});
+	});
+
+	it('carries all 8 biometric fields straight through from the input row (#1430)', () => {
+		const stat = buildBySpeciesStatsRow({
+			max_weight: 21.3,
+			avg_weight: 18.2,
+			min_weight: 15.1,
+			median_weight: 17.9,
+			max_wing: 71,
+			avg_wing: 69.4,
+			min_wing: 67,
+			median_wing: 69
+		});
+		expect(deriveSpeciesTotalsRowByEncounter(stat)).toMatchObject({
+			max_weight: 21.3,
+			avg_weight: 18.2,
+			min_weight: 15.1,
+			median_weight: 17.9,
+			max_wing: 71,
+			avg_wing: 69.4,
+			min_wing: 67,
+			median_wing: 69
+		});
+	});
+
+	it('passes a null biometric field through unchanged (species with no biometric-eligible encounters)', () => {
+		const stat = buildBySpeciesStatsRow({
+			max_weight: null,
+			avg_weight: null,
+			min_weight: null,
+			median_weight: null,
+			max_wing: null,
+			avg_wing: null,
+			min_wing: null,
+			median_wing: null
+		});
+		expect(deriveSpeciesTotalsRowByEncounter(stat)).toMatchObject({
+			max_weight: null,
+			avg_weight: null,
+			min_weight: null,
+			median_weight: null,
+			max_wing: null,
+			avg_wing: null,
+			min_wing: null,
+			median_wing: null
 		});
 	});
 
