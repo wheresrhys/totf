@@ -629,9 +629,11 @@ shape.
 **The counts/biometrics split this rule's worked example used to be about is gone.** Both halves of
 a stats cell have ridden on one `SimpleStatsCacheBySpecies` row since #1415, and #1418 deleted the
 last of the rejoining machinery (`modules/stats-view`'s `mergeSpeciesBiometrics` and
-`SpeciesStatsRow`). `SppStatsTable`'s test accordingly consumes
+`SpeciesStatsRow`). `SpeciesTotalsTable`'s test accordingly consumes
 `tables/SimpleStatsCacheBySpecies/alpha.by-species.json` as-is — one verbatim source fixture, no
 merge — and the rule above now only bites where an action genuinely still joins two sources.
+(The worked example used to name `SppStatsTable`'s test; that component went with the `/species`
+list page it rendered, #1434.)
 `app/__tests__/helpers/biometrics-stats-fixtures.ts` remains, derived since #1273 from the
 generated `stats_cache_biometrics_metrics/` snapshots via that same rule's species_id→name join.
 

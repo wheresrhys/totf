@@ -717,7 +717,8 @@ describe('stats_cache_basic_session_metrics', () => {
 	// Every block above exercises a cache-aligned window (a whole year/month/
 	// month-squashed, or no window at all). An ungrouped-by-time, grouped-by-
 	// species, arbitrary (non-calendar-aligned) from_date/to_date window is the
-	// shape the /species list page's free-text date inputs actually ask for, so
+	// shape the /species list page's free-text date inputs used to ask for
+	// before #1434 deleted that page, and the one the RPC still has to answer, so
 	// it gets its own fixture: five group-days straddling the window, two of them
 	// landing exactly on its boundaries and two a single day outside.
 	describe('arbitrary (non-cache-aligned) date window', () => {

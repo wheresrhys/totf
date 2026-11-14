@@ -29,9 +29,12 @@ test.describe('cross-group pages (beta user viewing alpha data)', { tag: '@beta'
 		})
 	})
 
-	test.describe('/group/[alphaSlug]/species', () => {
+	// Was `/group/[alphaSlug]/species` until #1434 deleted that list page; the
+	// cross-group read it exercises is the same one, now behind the summary
+	// page's Species tab.
+	test.describe('/group/[alphaSlug]/summary (species tab)', () => {
 		test('shows species table with alpha species', async ({ page }) => {
-			await page.goto(`/group/${alphaSlug}/species`)
+			await page.goto(`/group/${alphaSlug}/summary?tabId=species-totals`)
 			await expect(page.getByRole('link', { name: 'Robin' })).toBeVisible()
 			await expect(page.getByRole('link', { name: 'Blue Tit' })).toBeVisible()
 		})

@@ -13,9 +13,11 @@ import {
 	type BiometricStatName,
 	type StatsCacheBySpeciesResult
 	// The client-safe barrel: this module is `'use server'`, but
-	// `SppStatsTable` (`'use client'`) imports `fetchSpeciesData` out of it, so
-	// it counts as reachable from a Client Component — see `modules/stats`'
-	// CLAUDE.md's "Barrel split". Nothing here needs the server-only surface.
+	// `fetchSpeciesData` is reached from a Client Component (the summary
+	// Species tab, via `summary-tab-prefetchers.ts`'s
+	// `fetchSummarySpeciesTotalsData`), so this module counts as reachable from
+	// one — see `modules/stats`' CLAUDE.md's "Barrel split". Nothing here needs
+	// the server-only surface.
 } from '@/modules/stats/browser';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 
@@ -45,7 +47,7 @@ function pickBiometricStats(
 }
 
 /**
- * One `/species` row: a counts row with its biometric half applied over the
+ * One by-species row: a counts row with its biometric half applied over the
  * top. `species_id` is dropped — it is the pre-resolution form of the
  * `species_name` the counts row already carries, and `StatsCacheBySpeciesResult`
  * omits it for that reason.
@@ -80,9 +82,9 @@ function buildSpeciesRow(
 
 /**
  * The arbitrary-window fallback: the one window shape where the two halves of
- * this page genuinely come from two different sources, so they genuinely have
- * to be merged. `stats_cache_biometrics_metrics` recomputes the 8 wing/weight
- * columns live for the window, and each of its rows is applied onto the
+ * a by-species read genuinely come from two different sources, so they
+ * genuinely have to be merged. `stats_cache_biometrics_metrics` recomputes the
+ * 8 wing/weight columns live for the window, and each of its rows is applied onto the
  * matching counts row `fetchAuthorisedCoreStats` already recomputed from
  * `stats_cache_basic_session_metrics`.
  *
@@ -167,14 +169,14 @@ async function mergeLiveBiometricsIntoCountsRows(
 	);
 }
 
-// The /species list page's rows, split exactly the way its counts half
+// A by-species read's rows, split exactly the way its counts half
 // (`fetchAuthorisedCoreStats`) is — same window, same resolver, same fallback,
 // deliberately in lockstep (#1223):
 //
 // - A cache-aligned window (all time, a whole calendar year, a whole calendar
-//   month, a squashed calendar month — i.e. the page's default and year-select
-//   views) needs no second read at all (#1421): `countsRows` already *are*
-//   whole `SimpleStatsCacheBySpecies` rows — `fetchAuthorisedCoreStats`'s own
+//   month, a squashed calendar month — i.e. every window the summary pages'
+//   Species tab asks for) needs no second read at all (#1421): `countsRows`
+//   already *are* whole `SimpleStatsCacheBySpecies` rows — `fetchAuthorisedCoreStats`'s own
 //   cache-table read (`runStatsCacheRead` → `readStatsCacheRows`) is a
 //   `select('*')` against this exact table for this exact window — so the 8
 //   wing/weight columns the post-import refresh queue materialized alongside
@@ -184,8 +186,10 @@ async function mergeLiveBiometricsIntoCountsRows(
 //   `buildSpeciesRow` on why the 8 columns still have to be explicitly
 //   re-picked (and blanked for a `'public'`/`'blocked'` viewer) rather than
 //   trusted onto the result unconditionally.
-// - An arbitrary window (the page's two free-text date inputs) has its
-//   biometric half computed live instead, by `stats_cache_biometrics_metrics`
+// - An arbitrary window — no UI offers one since the `/species` list page's
+//   two free-text date inputs went away with the page itself (#1434), but the
+//   signature still accepts one — has its biometric half computed live
+//   instead, by `stats_cache_biometrics_metrics`
 //   (#1244 — it used to be `biometrics_stats`, which nothing here calls any
 //   more), and merged onto the counts half. `MAX`/`MIN` would survive being
 //   recombined from finer cells, but `AVG`/`MEDIAN` are not associative:
@@ -201,12 +205,14 @@ async function mergeLiveBiometricsIntoCountsRows(
 // resolved data ('own' or 'shared'); a 'blocked' or 'public' accessLevel
 // contributes none.
 //
-// That 'public' case is now live rather than theoretical: the /species list
-// page became anonymously viewable for a `public_areas: ['summary']` group
-// (#1231), so an anonymous visitor sees the counts half of the table with the
-// 8 wing/weight columns blank. Widening the biometrics half to match would
-// mean publishing measurement data a group only opted its *summary* into, so
-// it stays gated until `public_areas` grows a tag that says otherwise.
+// That 'public' case is live rather than theoretical: an anonymous visitor to
+// a `public_areas: ['summary']` group's `/group/<slug>/summary` reaches this
+// read through the Species tab, and sees the counts half of the table with the
+// 8 wing/weight columns blank. (It first became reachable via the `/species`
+// list page, #1231, which #1434 then deleted in favour of that tab.) Widening
+// the biometrics half to match would mean publishing measurement data a group
+// only opted its *summary* into, so it stays gated until `public_areas` grows
+// a tag that says otherwise.
 async function fetchSpeciesRowsWithBiometrics(
 	viewedGroup: ViewedGroup,
 	countsRows: AuthorisedStatsRow<true>[],
@@ -238,13 +244,15 @@ async function fetchSpeciesRowsWithBiometrics(
 }
 
 /**
- * `fetchSpeciesData`'s result alongside the `accessLevel` that served it —
- * for the one caller (the `/species` list page, #1232) that needs to know
- * whether the viewer can reach the arbitrary-window fallback (the two
- * free-text date inputs) at all. Every other caller
- * keeps using the rows-only `fetchSpeciesData` below, unaffected.
+ * `resolveSpeciesData`'s result: the rows alongside the `accessLevel` that
+ * served them. Module-internal — `fetchSpeciesData` below is the only caller
+ * and discards the access level. It used to be exported, alongside a
+ * `fetchSpeciesDataWithAccessLevel` that surfaced it, for the `/species` list
+ * page (#1232), which needed to know whether the viewer could reach the
+ * arbitrary-window fallback (its two free-text date inputs) at all; that page
+ * is gone (#1434) and so is its only consumer.
  */
-export type SpeciesDataWithAccessLevel = {
+type SpeciesDataWithAccessLevel = {
 	accessLevel: GroupSummaryAccessLevel;
 	rows: StatsCacheBySpeciesResult[];
 };
@@ -302,18 +310,4 @@ export async function fetchSpeciesData(
 		monthFilter
 	);
 	return rows;
-}
-
-/**
- * Same read as `fetchSpeciesData`, but surfaces the `accessLevel` that
- * `fetchAuthorisedCoreStats` resolved instead of discarding it — see
- * `SpeciesDataWithAccessLevel`'s doc comment for who needs this and why.
- */
-export async function fetchSpeciesDataWithAccessLevel(
-	viewedGroup: ViewedGroup,
-	fromDate?: string,
-	toDate?: string,
-	monthFilter?: number
-): Promise<SpeciesDataWithAccessLevel> {
-	return resolveSpeciesData(viewedGroup, fromDate, toDate, monthFilter);
 }

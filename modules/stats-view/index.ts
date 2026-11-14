@@ -14,7 +14,6 @@ export {
 	deriveSpeciesTotalsRow,
 	deriveSpeciesTotalsRowByEncounter
 } from './lib/species-totals';
-export { speciesStatConfigs } from './lib/species-stats';
 export {
 	buildGroupSquashedMonthSummaryHref,
 	buildSpeciesSquashedMonthHref,
@@ -48,5 +47,4 @@ export {
 	type SpeciesPeriod
 } from './components/SpeciesTotalsTable';
 export { SessionSpeciesTotalsTable } from './components/SessionSpeciesTotalsTable';
-export { SppStatsTable } from './components/SppStatsTable';
 export { SpTable } from './components/SpTable';

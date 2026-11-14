@@ -459,8 +459,9 @@ describe('summary read-path access model', () => {
 				client as never
 			);
 
-			// A shape the /species list page's free-text date inputs can
-			// produce — no cache cell spans it, and its distinct-count columns
+			// A shape no UI asks for since the /species list page's free-text
+			// date inputs went away with it (#1434), but the signature still
+			// accepts — no cache cell spans it, and its distinct-count columns
 			// can't be rebuilt from finer cells. Ungrouped by species here, so
 			// no Species join is needed — species_name comes back null.
 			const result = await fetchAuthorisedCoreStats(viewedGroup, {
@@ -533,8 +534,9 @@ describe('summary read-path access model', () => {
 	// is exactly why they need pinning here: a wrong placeholder is invisible to
 	// both `tsc` and every other test in this file.
 	describe('the arbitrary-window live recompute', () => {
-		// The one window shape no cache cell spans — the /species list page's
-		// free-text date inputs.
+		// The one window shape no cache cell spans. Its only UI source was the
+		// /species list page's free-text date inputs, deleted with the page
+		// (#1434); the read path still supports the shape.
 		const ARBITRARY_WINDOW: StatsWindowParams = {
 			group_by_species: false,
 			from_date: '2026-04-25',

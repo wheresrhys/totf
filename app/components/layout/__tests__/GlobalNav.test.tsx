@@ -17,11 +17,14 @@ describe('DesktopNavItems', () => {
 		expect(screen.getByRole('link', { name: 'Sessions' })).toBeDefined();
 	});
 
-	it('renders Species link at top level', () => {
+	// The standalone `/species` list page was deleted by #1434; the nav's
+	// Species link now opens the summary page's Species tab instead.
+	it("renders Species link at top level, pointing at the summary page's species-totals tab", () => {
 		render(
 			<DesktopNavItems classes="" moreExpanded={false} onMoreClick={noOp} />
 		);
-		expect(screen.getByRole('link', { name: 'Species' })).toBeDefined();
+		const link = screen.getByRole('link', { name: 'Species' });
+		expect(link.getAttribute('href')).toBe('/summary?tabId=species-totals');
 	});
 
 	it('renders a More button', () => {
@@ -103,9 +106,10 @@ describe('MobileNavItems', () => {
 		expect(screen.getByRole('link', { name: 'Sessions' })).toBeDefined();
 	});
 
-	it('includes Species link', () => {
+	it("includes Species link, pointing at the summary page's species-totals tab", () => {
 		render(<MobileNavItems classes="" />);
-		expect(screen.getByRole('link', { name: 'Species' })).toBeDefined();
+		const link = screen.getByRole('link', { name: 'Species' });
+		expect(link.getAttribute('href')).toBe('/summary?tabId=species-totals');
 	});
 
 	it('includes Compare Species link', () => {

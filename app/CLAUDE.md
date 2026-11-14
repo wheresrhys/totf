@@ -56,12 +56,14 @@ an RPC call** — three things follow from that:
   through. As before, a `'shared'` read that is authorised but finds no data resolves to `'blocked'` —
   nothing in either read path distinguishes the two.
 - **The old RPC params are translated into `temporal_unit`/`time_period` filters**, and the one shape
-  that can't be — an _ungrouped_ aggregate over a window that isn't itself a single cache cell, i.e.
-  the `/species` list page's two free-text date inputs — still falls back to a live
+  that can't be — an _ungrouped_ aggregate over a window that isn't itself a single cache cell —
+  still falls back to a live
   `stats_cache_basic_session_metrics` recompute for the `'own'`/`'shared'` branches (#1244 — it used
   to be the `core_stats` RPC, since dropped from the schema outright, #1359). The cache can't
   answer those: the aggregate's distinct-count columns (`bird_count`, the `*_bird_count` age buckets) can't be rebuilt
-  by summing finer cells. Every window the summary pages ask for (all time, a whole calendar year, a
+  by summing finer cells. **No UI asks for such a window any more:** the only one that did was the
+  `/species` list page's two free-text date inputs, deleted with the page itself (#1434). Every
+  window the summary pages ask for (all time, a whole calendar year, a
   whole calendar month, a squashed calendar month) _is_ a cache cell and reads from the cache. See
   `resolveStatsCacheQueryPlan`'s own comment for the full param→filter mapping, including the
   year-grain-for-one-calendar-month read that goes via the month grain. **The `'public'` branch is the
@@ -92,11 +94,14 @@ anything else runs. A no-cookie request only ever falls through to `<LoginModal>
 `lib/public-group-access.ts`'s `resolvePublicPageViewedGroupId(pathname)` returns `null`; that helper
 matches the pathname against its list of public path patterns, resolves the target group by slug, and
 checks its `public_areas`, returning the viewed group's id (instead of a bare boolean) when all three
-line up. Two patterns are in that list: the `/group/<slug>/summary` subtree (#770), and the
-`/group/<slug>/species` **list page only** (#1231) — anchored so the `/species/<name>` detail pages
-stay gated. Both are granted by the single `'summary'` `public_areas` tag; widening what that one tag
+line up. One pattern is in that list: the `/group/<slug>/summary` subtree (#770). A second,
+`/group/<slug>/species` **list page only** (#1231), was removed with that page itself (#1434) —
+its per-species table is now the summary subtree's own Species tab
+(`/group/<slug>/summary?tabId=species-totals`), so the one remaining pattern already covers it;
+`/species/<name>` detail pages stay gated, exactly as that anchored pattern ensured. Granted by
+the single `'summary'` `public_areas` tag; widening what that one tag
 reaches is a matter of adding a pattern here, not of adding a tag (`public_areas` still only allows
-`'summary'`, #768). An anonymous `/species` view gets the counts half of the table only: `spp-data.ts`'s
+`'summary'`, #768). An anonymous view of that Species tab gets the counts half of the table only: `spp-data.ts`'s
 `fetchSpeciesRowsWithBiometrics` runs as the viewer against ungated sources, so it's skipped for a
 `'public'` (or `'blocked'`) access level and the 8 wing/weight columns are explicitly blanked
 (`buildSpeciesRow`, #1415) rather than left to whatever the counts rows happen to carry — a
@@ -191,8 +196,9 @@ entrypoint, its content, and its data fetcher:
   page's redirect-to-own-group) passes an `async` callback. (It's a HOF, not a React context
   provider, because these are async server components and context is client-only.) Its own export
   is named `Group___Page` (e.g. `GroupHomePage`,
-  `GroupMistakesPage`; disambiguated where a route has more than one group-scoped variant, e.g.
-  `GroupSpeciesPage` for the list vs. `GroupSpeciesDetailPage` for `species/[speciesName]`).
+  `GroupMistakesPage`; disambiguated where a route has more than one group-scoped variant — e.g.
+  `GroupSpeciesDetailPage` for `species/[speciesName]`, which was named to distinguish it from a
+  `GroupSpeciesPage` for the sibling `species/` list page, since deleted (#1434)).
   Group variants don't need their own `PageContent.tsx`. A route that only exists in
   group-scoped form (no bare top-level URL — e.g. the by-date session page,
   `group/[groupSlug]/session/[date]/`) still follows the `Group___Page` / `___PageContent` /
@@ -214,8 +220,8 @@ entrypoint, its content, and its data fetcher:
   boundary, no own `CLAUDE.md` — import each file by its own path. Promotion to a real
   `modules/charts` is tracked under #1253.
 - **Stats-table components** are not under `app/components/` at all — `PeriodTotalsTable`,
-  `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SppStatsTable` and `SpTable`, and the
-  `period-totals`/`species-totals`/`species-stats`/`squashed-month` helpers that build their row
+  `SpeciesTotalsTable`, `SessionSpeciesTotalsTable` and `SpTable`, and the
+  `period-totals`/`species-totals`/`squashed-month` helpers that build their row
   models, live in `modules/stats-view/` (#1327) and are imported from the `@/modules/stats-view`
   barrel. Unlike `app/components/charts/` above that one _is_ a real module — barrel, import
   boundary, own [`CLAUDE.md`](../modules/stats-view/CLAUDE.md).
