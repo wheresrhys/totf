@@ -8,7 +8,6 @@ const ownGroupRoutes = [
   '/',
   '/bird',
   '/bird/A123456',
-  '/species',
   '/species/Blue%20Tit',
   '/mistakes',
   '/retraps',
@@ -17,7 +16,6 @@ const ownGroupRoutes = [
 
 const crossGroupRoutes = [
   '/group/1',
-  '/group/1/species',
   '/group/1/species/Blue%20Tit',
   '/group/1/mistakes',
   '/group/1/retraps',
@@ -39,5 +37,20 @@ describe('cross-group routes (unauthenticated)', () => {
     const response = await fetch(BASE_URL + route, { redirect: 'manual' })
     expect(response.status).toBeGreaterThanOrEqual(300)
     expect(response.status).toBeLessThan(400)
+  })
+})
+
+// The standalone /species list page was deleted in favour of the summary
+// page's Species tab (#1434). Both route variants used to live above — the
+// ungrouped one behind the login modal, the group-scoped one redirecting —
+// so asserting they now 404 is what proves the route is genuinely gone rather
+// than merely dropped from the public-path allowlist. There is no catch-all
+// segment under either, so Next.js serves its own bare 404 for both.
+const deletedRoutes = ['/species', '/group/1/species']
+
+describe('deleted species list routes', () => {
+  test.each(deletedRoutes)('%s returns a 404', async (route) => {
+    const response = await fetch(BASE_URL + route, { redirect: 'manual' })
+    expect(response.status).toBe(404)
   })
 })

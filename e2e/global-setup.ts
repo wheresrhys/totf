@@ -77,7 +77,9 @@ async function warmupServer() {
 	const routes = [
 		'/',
 		'/sessions',
-		'/species',
+		// Was '/species' until #1434 deleted that list page; the summary page's
+		// Species tab is what the specs hit now, so that's what needs warming.
+		'/summary',
 		'/mistakes',
 		'/retraps',
 		'/ring-sequences',

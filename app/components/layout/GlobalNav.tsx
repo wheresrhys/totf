@@ -8,6 +8,15 @@ import { logout } from '@/app/actions/logout';
 import type { RingingGroupRow } from '@/app/models/db';
 import type { SimpleSpeciesRow } from '@/app/lib/global-nav-data';
 import { shouldExpandBirdNavByDefault } from '@/app/lib/global-nav-expansion';
+// The summary page's Species tab, which replaced the standalone `/species`
+// list page (#1434). A plain literal like every other nav href here: the
+// `species-totals` id itself lives on `SPECIES_TOTALS_TAB_ID`
+// (`app/components/pages/summary/summary-tab-prefetchers.ts`), but that module
+// imports the summary tabs' server-side `dataFetcher`s, so importing the
+// constant into this `'use client'` file would drag the whole summary data
+// layer into the nav's client graph for one string.
+const speciesTabHref = '/summary?tabId=species-totals';
+
 const moreLinks = [
 	{ href: '/mistakes', label: 'Mistakes' },
 	{ href: '/retraps', label: 'Retraps' },
@@ -34,7 +43,7 @@ export function DesktopNavItems({
 				<NoPrefetchLink href="/sessions">Sessions</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
+				<NoPrefetchLink href={speciesTabHref}>Species</NoPrefetchLink>
 			</li>
 			<li className="relative">
 				<button type="button" className="cursor-pointer" onClick={onMoreClick}>
@@ -67,7 +76,7 @@ export function MobileNavItems({ classes }: { classes: string }) {
 				<NoPrefetchLink href="/sessions">Sessions</NoPrefetchLink>
 			</li>
 			<li>
-				<NoPrefetchLink href="/species">Species</NoPrefetchLink>
+				<NoPrefetchLink href={speciesTabHref}>Species</NoPrefetchLink>
 			</li>
 			{moreLinks.map(({ href, label }) => (
 				<li key={href}>

@@ -56,9 +56,10 @@ export default defineConfig({
 			dependencies: ['setup'],
 		},
 		// No storageState and no `setup` dependency — this project exists
-		// precisely to exercise the no-session-cookie paths (#1231's public
-		// `/species` list page, and the login gate every other group still
-		// keeps). `@all` is deliberately NOT in the grep: an authenticated
+		// precisely to exercise the no-session-cookie paths (the public summary
+		// subtree — including the Species tab that replaced #1231's public
+		// `/species` list page, #1434 — and the login gate every other group
+		// still keeps). `@all` is deliberately NOT in the grep: an authenticated
 		// spec's assertions don't hold without a cookie.
 		{
 			name: 'anonymous',

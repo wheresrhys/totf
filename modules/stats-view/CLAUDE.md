@@ -7,11 +7,13 @@ stack, and the "Module conventions" section this module follows.
 
 The "stats table" UI — the sortable, age-bucketed totals tables every summary/species/session tab
 is built out of — plus the pure functions that reshape a `stats_cache_*_metrics`/`SimpleStatsCache`
-row into the row model each table renders. Five components and four data-shaping helpers,
+row into the row model each table renders. Four components and four data-shaping helpers,
 previously scattered across `app/components/`, `app/components/pages/species/`,
 `app/components/pages/session/` and
 `app/lib/` with no single owned location. Pure relocation (#1327): behaviour is unchanged, only
-the import path moved.
+the import path moved. It arrived with five components; `SppStatsTable` and its
+`lib/species-stats.ts` column set were deleted with the standalone `/species` list page they were
+the whole of (#1434), replaced by `SpeciesTotalsTable` on the summary page's Species tab.
 
 **Widened scope (#1353):** the three two-option toggles (`AggregateByToggle`,
 `CombineYearsToggle`, `EmptyMonthsToggle`) and the age-bucketed column-set/table-body factories
@@ -26,7 +28,7 @@ Like `modules/ui-kit` (which this module builds directly on top of) and unlike `
 this module is consumed only by `app/` — nothing else imports it. It's catalogued as a module
 because it's large enough to warrant its own directory/barrel/doc (and its own
 `zone:modules/stats-view` label), not because it's cross-zone, and
-it has no `browser.ts`/`index.ts` split: all five components are `'use client'`
+it has no `browser.ts`/`index.ts` split: all four components are `'use client'`
 (`SessionSpeciesTotalsTable` was the one plain Server Component until #1431 gave it a
 `useState`-backed Counts/Biometrics toggle), but none of the files imports a server-only
 dependency, so the single barrel is safe from either side of the boundary.
@@ -44,12 +46,12 @@ The one edge between them is **type-only and one-directional**: every file here 
 cache cell imports its shape from `@/modules/stats/browser` — `StatsResult` (the either-grain union)
 in `lib/period-totals.ts`, `lib/species-totals.ts` and `components/PeriodTotalsTable.tsx` since
 #1417, and `StatsCacheBySpeciesResult` (the by-species member) in `types.ts`,
-`lib/species-totals.ts`, `components/SpeciesTotalsTable.tsx` and `components/SppStatsTable.tsx`
+`lib/species-totals.ts` and `components/SpeciesTotalsTable.tsx`
 since #1418 retargeted them off the deleted `SpeciesStatsRow`.
 `modules/stats` imports nothing from here and never will;
 the direction is what matters, since the React/JSX constraint above is entirely about what ends up
 in `modules/stats`' module graph. Always the `/browser` barrel, never the bare `@/modules/stats`
-one — four of the five components here are `'use client'` (see this module's own header, and
+one — all four components here are `'use client'` (see this module's own header, and
 `modules/stats/CLAUDE.md`'s "Barrel split").
 
 ## Directory map
@@ -61,11 +63,12 @@ modules/stats-view/
               # (lib/session-species-biometrics.ts) are deliberately not on it: no
               # caller outside the module, the same treatment modules/stats gives
               # runSimpleStatsCacheRefreshPass
-  types.ts    # the 6 types shared across more than one file in this module —
+  types.ts    # the 5 types shared across more than one file in this module —
               # PeriodTotalsGrouping, PeriodTotalsRow, SpeciesTotalsRow,
-              # SpeciesStatConfig, SessionSpeciesBiometrics, StatsClass. Before #1327
+              # SessionSpeciesBiometrics, StatsClass. Before #1327
               # each lived in whichever helper derived it and was imported
-              # file-to-file from there
+              # file-to-file from there. SpeciesStatConfig was a sixth until
+              # #1434 deleted its only consumer, lib/species-stats.ts
   lib/
     period-totals.ts    # derivePeriodTotalsRowByBird / ...ByEncounter — one
                         # StatsResult (either grain) -> one PeriodTotalsRow, per the
@@ -81,10 +84,6 @@ modules/stats-view/
                         # capture_method, a grain nothing materializes. Null-on-empty
                         # (never zero) and an interpolating PERCENTILE_CONT(0.5) median,
                         # matching the SQL layer's own convention for those columns
-    species-stats.ts    # speciesStatConfigs — the /species list page's column set, the
-                        # file's only export since #1418 deleted mergeSpeciesBiometrics
-                        # (the counts/wing-weight rejoin, callerless since #1415) and the
-                        # SpeciesStatsRow it returned
     squashed-month.ts   # the 12 month abbreviations a `[yearOrMonth]` route segment
                         # accepts as a squashed-month filter, their parse/format
                         # helpers, and the two squashed-month href builders
@@ -115,9 +114,7 @@ modules/stats-view/
                                  # (#1433), and the totals row (moved from
                                  # modules/ui-kit, #1353). See "Biometric column
                                  # order and tinting" below
-    __tests__/          # one test per helper above except species-stats.ts (whose only
-                        # export is a column-config list tsc already proves, #1418),
-                        # plus helpers/two-option-toggle.tsx
+    __tests__/          # one test per helper above, plus helpers/two-option-toggle.tsx
                         # (the toggle components' shared test runner, also moved
                         # from modules/ui-kit, #1353)
     components/
@@ -136,12 +133,10 @@ modules/stats-view/
                                      # breakdown block between the age buckets +
                                      # Max Proven Age and the 8 client-side-derived
                                      # wing/weight stats
-      SppStatsTable.tsx             # the /species list page's whole table including
-                                     # its year/CES/date-range filter form
       SpTable.tsx                   # one row per individual bird of one species, with
                                      # an expandable per-bird encounters drill-down
-      __tests__/                    # PeriodTotalsTable, SpeciesTotalsTable,
-                                     # SppStatsTable and — since #1431 gave it a
+      __tests__/                    # PeriodTotalsTable, SpeciesTotalsTable
+                                     # and — since #1431 gave it a
                                      # mode-dependent column set —
                                      # SessionSpeciesTotalsTable have one; SpTable has
                                      # none (#1327 added no new tests, and it's covered
@@ -191,30 +186,32 @@ apply everywhere at the same time. Two things about it are easy to get wrong:
   `modules/stats`" above for why that edge is fine and why it must always be the `/browser` barrel.
 - **`@/app/models/{bird,encounter,session}`** — `EnrichedBirdOfSpecies`, `SpeciesWithEncounters`,
   `getAgeClass`. **No file here imports `app/models/db.ts` at all any more** — source or test:
-  #1418 retargeted the last two source files (`types.ts`, `lib/species-stats.ts`) off that file's
+  #1418 retargeted the last two source files (`types.ts`, the since-deleted
+  `lib/species-stats.ts`) off that file's
   `@deprecated` stats aliases onto the canonical `modules/stats` names above, and #1419 swept the
   four test files that still named them as it deleted the aliases outright.
 - **A handful of `app/` leaves** — `@/app/lib/group-slug` (`ViewedGroup`),
-  `@/app/lib/measurement-range`, `@/app/actions/spp-data` (`SppStatsTable`'s own refetch on filter
-  change), `@/app/components/SingleBirdTable`,
-  `@/app/components/pages/species/MeasurementRangeCell`,
-  `@/app/components/pages/session/EncountersTable`, and the type-only
-  `@/app/(routes)/species/page` (`PageData`). The three components among those stayed put on
-  purpose: `SingleBirdTable` is independently reused by the mistakes and bird pages, and
+  `@/app/lib/measurement-range`, `@/app/components/SingleBirdTable`,
+  `@/app/components/pages/species/MeasurementRangeCell` and
+  `@/app/components/pages/session/EncountersTable`. There were two more until #1434 deleted
+  `SppStatsTable`, which owned both: `@/app/actions/spp-data` (its own refetch on filter change)
+  and the type-only `@/app/(routes)/species/page` (`PageData`) — so **no file here imports an
+  `app/` route or action any more**, only leaf components and helpers. The three components among
+  those stayed put on purpose: `SingleBirdTable` is independently reused by the mistakes and bird pages, and
   `MeasurementRangeCell`/`EncountersTable` are page-family-specific rather than stats-table
   primitives.
 
-**One of those edges used to close a cycle through the barrel; #1415 broke it.**
+**One of those edges used to close a cycle through the barrel; it is fully gone now.**
 `app/actions/spp-data.ts` imported `mergeSpeciesBiometrics` from `@/modules/stats-view` while the
-barrel re-exported `SppStatsTable`, which imports `fetchSpeciesData` back out of
+barrel re-exported `SppStatsTable`, which imported `fetchSpeciesData` back out of
 `app/actions/spp-data.ts`. The module-boundary rule (root `CLAUDE.md`'s "Module conventions")
 forbade the obvious escape — an outside file reaching past the barrel into `lib/species-stats.ts`
 directly — so the cycle stood (`next build --turbopack` and the full app suite both passed with
-it, verified on #1327). It is gone now that `spp-data.ts` reads whole cache rows and merges its own
-arbitrary-window fallback, so it imports nothing from this module at all — and the function it used
-to reach for no longer exists, deleted outright by #1418. `SppStatsTable`'s inbound
-`fetchSpeciesData` import is the only edge left; if a future change needs a second one in the
-other direction, lift that fetch into a prop rather than reintroducing the cycle.
+it, verified on #1327). #1415/#1418 broke the outbound half (`spp-data.ts` reads whole cache rows
+and merges its own arbitrary-window fallback, and the function it reached for is deleted), and
+#1434 removed the inbound half with `SppStatsTable` itself. Nothing in this module imports an
+`app/` action at all now; if a future change wants one, lift the fetch into a prop rather than
+reintroducing the cycle.
 
 ## Testing
 

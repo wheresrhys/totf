@@ -44,9 +44,11 @@ const YEAR_FROM_DATE = '2026-01-01';
 const YEAR_TO_DATE = '2026-12-31';
 const MONTH_FROM_DATE = '2026-02-01';
 const MONTH_TO_DATE = '2026-02-28';
-// The /species list page's free-text date inputs' canonical arbitrary window,
-// aligned to no cache cell, so the live stats_cache_biometrics_metrics RPC
-// answers the biometric half and it has to be merged onto the counts half.
+// The canonical arbitrary window — aligned to no cache cell, so the live
+// stats_cache_biometrics_metrics RPC answers the biometric half and it has to
+// be merged onto the counts half. No UI asks for one since the /species list
+// page's two free-text date inputs went with the page (#1434); the fallback
+// itself is still a supported shape of the signature.
 const ARBITRARY_WINDOW_FROM_DATE = '2026-04-25';
 const ARBITRARY_WINDOW_TO_DATE = '2026-09-05';
 // Two species whose id order and alphabetical name order deliberately

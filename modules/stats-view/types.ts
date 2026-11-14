@@ -7,10 +7,7 @@
 // file that needs it imports it directly from `@/modules/stats/browser` rather
 // than through this module.
 
-import type {
-	BiometricStatName,
-	StatsCacheBySpeciesResult
-} from '@/modules/stats/browser';
+import type { BiometricStatName } from '@/modules/stats/browser';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
 
@@ -72,17 +69,3 @@ export type SpeciesTotalsRow = {
 	adultsCount: number;
 	unknownAgeCount: number;
 } & Record<BiometricStatName, number | null>;
-
-// A column of one whole by-species cache row — counts or wing/weight metric
-// alike. A species with no biometric-eligible encounters carries a real `null`
-// in the 8 wing/weight columns, which `MultiSpeciesTableBody`'s generic
-// `<td>{species[column.property]}</td>` renders as a blank cell — no
-// special-casing needed.
-export type SpeciesStatConfig = {
-	label: string;
-	property: keyof StatsCacheBySpeciesResult;
-	suffix?: string;
-	category?: string;
-	prefix?: string;
-	preferSortAscending?: boolean;
-};
