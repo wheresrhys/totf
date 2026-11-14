@@ -1,82 +1,191 @@
 'use client';
+
+import { useState } from 'react';
 import {
-	NoPrefetchLink,
-	SortableTable,
-	getFormattedValue,
-	type ColumnConfig,
-	type RowModelWithRawData
-} from '@/modules/ui-kit';
+	AggregateByToggle,
+	type AggregateByValue,
+	buildBiometricColumnConfigs,
+	buildStandardColumnConfigs,
+	createNameLinkCell,
+	createStatsTableBody,
+	CountsBiometricsToggle,
+	deriveSpeciesTotalsRow,
+	deriveSpeciesTotalsRowByEncounter,
+	type SpeciesTotalsRow,
+	type StatsClass
+} from '@/modules/stats-view';
+import { SortableTable, type ColumnConfig } from '@/modules/ui-kit';
+import type { ComparisonRow } from '@/app/lib/compare-species';
+import {
+	BiometricStatNames,
+	type BiometricStatName,
+	type StatsCacheBySpeciesResult
+} from '@/modules/stats/browser';
+
+/** The comparison table's one test id — only one table is ever rendered now. */
+export const COMPARISON_TABLE_TEST_ID = 'species-comparison-table';
 
 /**
- * One species per row, one stat per column (#115) — the rendering half of the
- * species-comparison page, generic over which of the three by-species stats
- * datasets is on show. All it knows is that a row has a `species_name`; the
- * columns, their labels and their formatters come from the caller
- * (`comparison-columns.ts`).
- *
- * Built on the shared `SortableTable` so the comparison is sortable by any
- * column for free. Its own body component (rather than `createStatsTableBody`)
- * because it has no drill-down rows to expand and a bare species link rather
- * than a configurable first-column component — not because of formatting:
- * `createStatsTableBody` applies each column's `formatter` too, as of #1431.
+ * Mirrors `SpeciesTotalsTable`'s own `RowModel`/`toRowModel`/`deriveRow` trio
+ * (`modules/stats-view/components/SpeciesTotalsTable.tsx`) rather than
+ * extracting a shared helper — this is only the 2nd use case, below this
+ * repo's DRY-after-3rd-use threshold (root `CLAUDE.md`). The 8
+ * `BiometricStatName` fields are intersected on rather than listed by hand,
+ * same reasoning as that file.
  */
-export function SpeciesComparisonTable<
-	RowModel extends { species_name: string }
+type RowModel = {
+	speciesName: string;
+	sessionsCount: number;
+	encounterCount: number;
+	maxPerSession: number;
+	individualsCount: number;
+	new: number;
+	retraps: number;
+	pullus: number;
+	juvs: number;
+	postjuv: number;
+	adults: number;
+	unknownAge: number;
+} & Record<BiometricStatName, number | null>;
+
+function toRowModel(row: SpeciesTotalsRow): RowModel {
+	return {
+		speciesName: row.speciesName,
+		sessionsCount: row.sessionsCount,
+		encounterCount: row.encounterCount,
+		maxPerSession: row.maxPerSession,
+		individualsCount: row.individualsCount,
+		new: row.newCount,
+		retraps: row.retrapsCount,
+		pullus: row.pullusCount,
+		juvs: row.juvsCount,
+		postjuv: row.postjuvCount,
+		adults: row.adultsCount,
+		unknownAge: row.unknownAgeCount,
+		...BiometricStatNames.reduce<Record<BiometricStatName, number | null>>(
+			(fields, name) => {
+				fields[name] = row[name];
+				return fields;
+			},
+			{} as Record<BiometricStatName, number | null>
+		)
+	};
+}
+
+// Picks the bird-based or encounter-based derive function per the "Aggregate
+// by" toggle, matching `SpeciesTotalsTable`'s own `deriveRow`.
+function deriveRow(
+	aggregateBy: AggregateByValue
+): (stat: StatsCacheBySpeciesResult) => SpeciesTotalsRow {
+	return aggregateBy === 'bird'
+		? deriveSpeciesTotalsRow
+		: deriveSpeciesTotalsRowByEncounter;
+}
+
+// Species/Sessions/Encounters head the table in either mode; everything after
+// them is what the Counts/Biometrics toggle switches — same column set and
+// ordering as `SpeciesTotalsTable`'s own `buildColumnConfigs`.
+function buildColumnConfigs(
+	hasPulli: boolean,
+	aggregateBy: string,
+	statsClass: StatsClass
+): Partial<Record<keyof RowModel, ColumnConfig>> {
+	return {
+		speciesName: {
+			label: 'Species',
+			preferSortAscending: true
+		},
+		sessionsCount: {
+			label: 'Sessions'
+		},
+		encounterCount: {
+			label: 'Encounters'
+		},
+		...(statsClass === 'biometrics'
+			? buildBiometricColumnConfigs()
+			: {
+					maxPerSession: {
+						label: 'Busiest session'
+					},
+					individualsCount: {
+						label: 'Birds'
+					},
+					...buildStandardColumnConfigs<RowModel>(hasPulli, true, aggregateBy)
+				})
+	};
+}
+
+const SpeciesNameCell = createNameLinkCell<StatsCacheBySpeciesResult, RowModel>(
+	(model) => model.speciesName,
+	(model) => `/species/${model.speciesName}`
+);
+
+const SpeciesComparisonTableBody = createStatsTableBody<
+	StatsCacheBySpeciesResult,
+	RowModel
 >({
+	FirstColumnComponent: SpeciesNameCell,
+	firstColumnKey: 'speciesName',
+	getKey: (model) => model.speciesName
+});
+
+/**
+ * The species-comparison page's table (#115), rebuilt on the same
+ * Counts/Biometrics + Aggregate-by toggles `SpeciesTotalsTable` uses, rather
+ * than its own pair of dataset tabs and bespoke column set — that mechanism
+ * predated the toggles (#1430-#1440), which now provide the same switch
+ * everywhere else.
+ *
+ * `rows` is a selection-ordered projection over the page's one by-species
+ * dataset — see `selectComparisonRows` (`@/app/lib/compare-species`) — so
+ * every element already carries a full `StatsCacheBySpeciesResult` in
+ * practice: the pill list this page offers is derived from that same
+ * dataset, so a selected species always has a row. `ComparisonRow`'s
+ * `species_name`-only placeholder shape is a guard for other, hypothetical
+ * callers whose rows and selection come from different places — hence the
+ * single documented assertion below rather than widening `deriveRow`'s
+ * signature to accept a partial row.
+ */
+export function SpeciesComparisonTable({
 	rows,
-	columnConfigs,
-	testId
+	testId = COMPARISON_TABLE_TEST_ID
 }: {
-	rows: RowModel[];
-	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>;
+	rows: ComparisonRow<StatsCacheBySpeciesResult>[];
 	testId?: string;
 }) {
-	function SpeciesComparisonTableBody({
-		data,
-		columnConfigs
-	}: {
-		data: RowModelWithRawData<RowModel, RowModel>[];
-		columnConfigs?: Partial<Record<keyof RowModel, ColumnConfig>>;
-	}) {
-		const valueColumnProperties = Object.keys(columnConfigs ?? {}).filter(
-			(property) => property !== 'species_name'
-		) as (keyof RowModel)[];
-		const formatCell = getFormattedValue<RowModel>(columnConfigs ?? {});
+	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
+	const [statsClass, setStatsClass] = useState<StatsClass>('counts');
 
-		return (
-			<tbody>
-				{data.map((row) => (
-					<tr key={row.species_name}>
-						<td>
-							<NoPrefetchLink
-								className="link text-wrap"
-								href={`/species/${row.species_name}`}
-							>
-								{row.species_name}
-							</NoPrefetchLink>
-						</td>
-						{valueColumnProperties.map((property) => (
-							<td
-								key={property as string}
-								className={columnConfigs?.[property]?.cellClassName}
-							>
-								{formatCell(row[property], property)}
-							</td>
-						))}
-					</tr>
-				))}
-			</tbody>
-		);
-	}
+	const speciesStats = rows as StatsCacheBySpeciesResult[];
+	const activeDeriveRow = deriveRow(aggregateBy);
+	const rowDataTransform = (stat: StatsCacheBySpeciesResult) =>
+		toRowModel(activeDeriveRow(stat));
+	const hasPulli = speciesStats.some(
+		(stat) => activeDeriveRow(stat).pullusCount > 0
+	);
+	const columnConfigs = buildColumnConfigs(hasPulli, aggregateBy, statsClass);
 
 	return (
-		<SortableTable<RowModel, RowModel>
-			columnConfigs={columnConfigs}
-			data={rows}
-			testId={testId}
-			rowDataTransform={(row) => row}
-			initialSortColumn="species_name"
-			TableBodyComponent={SpeciesComparisonTableBody}
-		/>
+		<>
+			<div data-test-id="above-header-row" className="m-2 flex gap-4">
+				{/* Biometrics mode has no age-bucket columns for "Aggregate by" to
+				affect, so the toggle is disabled (not hidden) while it's active,
+				matching `SpeciesTotalsTable`'s own treatment. */}
+				<AggregateByToggle
+					value={aggregateBy}
+					onChange={setAggregateBy}
+					disabled={statsClass === 'biometrics'}
+				/>
+				<CountsBiometricsToggle value={statsClass} onChange={setStatsClass} />
+			</div>
+			<SortableTable<StatsCacheBySpeciesResult, RowModel>
+				columnConfigs={columnConfigs}
+				data={speciesStats}
+				testId={testId}
+				rowDataTransform={rowDataTransform}
+				initialSortColumn="speciesName"
+				TableBodyComponent={SpeciesComparisonTableBody}
+			/>
+		</>
 	);
 }

@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { getCellTextByHeading } from '@/app/__tests__/helpers/table';
-import { compareSpeciesBiometricsTab } from '@/app/components/pages/compare-species/CompareSpeciesBiometricsTab';
-import { compareSpeciesCoreTab } from '@/app/components/pages/compare-species/CompareSpeciesCoreTab';
 import {
 	BiometricStatNames,
 	type BiometricStatName
@@ -18,21 +16,17 @@ vi.mock('@/app/actions/compare-species', () => ({
 	fetchSpeciesComparisonStats: mockFetchSpeciesComparisonStats
 }));
 
-// Alpha's captured all-time by-species cache rows — one row per species,
-// each already carrying both metric families' columns, which is exactly what
-// `fetchSpeciesComparisonStats` now returns (#1412). Both tabs read these same
-// rows.
+// Alpha's captured all-time by-species cache rows — one row per species.
 const speciesStatsRows = ALPHA_CORE_STATS_BY_SPECIES;
 
 const ALPHA_SPECIES = speciesStatsRows.map((row) => row.species_name);
 
 const robinRow = speciesStatsRows.find((row) => row.species_name === 'Robin')!;
+const wrenRow = speciesStatsRows.find((row) => row.species_name === 'Wren')!;
 
 /**
  * The real "no biometric-eligible encounters" shape: a cache row present for
- * the species, with all 8 wing/weight columns null. Withholding the row
- * entirely isn't an option any more — that would drop the species from both
- * tabs *and* from the pill list.
+ * the species, with all 8 wing/weight columns null.
  */
 const NO_BIOMETRIC_MEASUREMENTS = Object.fromEntries(
 	BiometricStatNames.map((name) => [name, null] as const)
@@ -57,10 +51,6 @@ function pill(speciesName: string) {
 	return screen.getByRole('button', { name: speciesName });
 }
 
-// The active dataset's table. `TabSet` lazy-*mounts* rather than unmounts, so
-// once a second tab has been visited both tables are in the DOM — but the
-// inactive one sits inside `ConditionalTabPanel`'s `aria-hidden` wrapper, so a
-// role query (unlike `getByTestId`) only ever sees the visible one.
 function visibleTable() {
 	return screen.getByRole('table');
 }
@@ -69,15 +59,19 @@ function dataRowCount() {
 	return visibleTable().querySelectorAll('tbody tr').length;
 }
 
-/** The active table's column headings, left to right. */
-function visibleColumnHeadings() {
+/** The table's column headings, left to right. */
+function columnHeadings() {
 	return [...visibleTable().querySelectorAll('thead tr:first-child th')].map(
 		(heading) => heading.textContent?.trim()
 	);
 }
 
-function showBiometricsTab() {
-	fireEvent.click(screen.getByRole('button', { name: 'Biometrics' }));
+function selectBiometricsColumns() {
+	fireEvent.click(screen.getByRole('radio', { name: 'Biometrics' }));
+}
+
+function selectEncounterAggregation() {
+	fireEvent.click(screen.getByRole('radio', { name: 'Encounter' }));
 }
 
 describe('compare species page', () => {
@@ -211,8 +205,8 @@ describe('compare species page', () => {
 		});
 	});
 
-	describe('switching dataset', () => {
-		it('shows the core stats columns by default', async () => {
+	describe('the Counts/Biometrics toggle', () => {
+		it('shows the counts columns by default', async () => {
 			await renderComparePage({ name: ['Robin'] });
 
 			expect(
@@ -226,79 +220,74 @@ describe('compare species page', () => {
 			);
 		});
 
-		it('shows the biometrics columns when the Biometrics tab is selected', async () => {
+		it('renders the counts column headings in their existing order', async () => {
 			await renderComparePage({ name: ['Robin'] });
 
-			showBiometricsTab();
-
-			expect(
-				screen.getByRole('columnheader', { name: 'Avg weight (g)' })
-			).toBeTruthy();
-			expect(screen.queryByRole('columnheader', { name: 'Encounters' })).toBe(
-				null
-			);
-		});
-
-		it('renders the core dataset column headings in their existing order', async () => {
-			await renderComparePage({ name: ['Robin'] });
-
-			expect(visibleColumnHeadings()).toEqual([
+			expect(columnHeadings()).toEqual([
 				'Species',
 				'Sessions',
-				'Birds',
 				'Encounters',
-				'New',
 				'Busiest session',
-				'Most new in a session',
+				'Birds',
+				'New',
+				'Retrap',
 				'Pulli',
 				'Juv',
 				'Postjuv',
 				'Adult',
-				'Not aged',
-				'Pulli encounters',
-				'Juv encounters',
-				'Postjuv encounters',
-				'Adult encounters',
-				'Not aged encounters'
+				'Not aged'
 			]);
 		});
 
-		it('renders the biometrics dataset column headings in their existing order', async () => {
+		it('shows the biometrics columns when the Biometrics option is selected', async () => {
 			await renderComparePage({ name: ['Robin'] });
 
-			showBiometricsTab();
+			selectBiometricsColumns();
 
-			expect(visibleColumnHeadings()).toEqual([
+			expect(
+				screen.getByRole('columnheader', { name: 'Avg weight (g)' })
+			).toBeTruthy();
+			expect(screen.queryByRole('columnheader', { name: 'New' })).toBe(null);
+		});
+
+		it('renders the biometrics column headings in their existing order', async () => {
+			await renderComparePage({ name: ['Robin'] });
+
+			selectBiometricsColumns();
+
+			expect(columnHeadings()).toEqual([
 				'Species',
-				'Min weight (g)',
+				'Sessions',
+				'Encounters',
+				'Max weight (g)',
 				'Avg weight (g)',
 				'Median weight (g)',
-				'Max weight (g)',
-				'Min wing (mm)',
+				'Min weight (g)',
+				'Max wing (mm)',
 				'Avg wing (mm)',
 				'Median wing (mm)',
-				'Max wing (mm)'
+				'Min wing (mm)'
 			]);
 		});
 
-		it('reads both tabs cells off the same row', async () => {
+		it('reads both views off the same row', async () => {
 			await renderComparePage({ name: ['Robin'] });
 
 			expect(getCellTextByHeading('Encounters', 'Robin')).toBe(
 				String(robinRow.encounter_count)
 			);
 
-			showBiometricsTab();
+			selectBiometricsColumns();
 
 			expect(getCellTextByHeading('Avg weight (g)', 'Robin')).toBe(
 				String(Number(robinRow.avg_weight!.toFixed(1)))
 			);
 		});
 
-		it('keeps the selected species when switching dataset', async () => {
+		it('keeps the selected species when switching views', async () => {
 			await renderComparePage({ name: ['Robin', 'Wren'] });
 
-			showBiometricsTab();
+			selectBiometricsColumns();
 
 			expect(dataRowCount()).toBe(2);
 		});
@@ -313,77 +302,44 @@ describe('compare species page', () => {
 			);
 			await renderComparePage({ name: ['Robin', 'Wren'] });
 
-			showBiometricsTab();
+			selectBiometricsColumns();
 
 			expect(dataRowCount()).toBe(2);
 			expect(getCellTextByHeading('Avg weight (g)', 'Robin')).toBe('—');
 			expect(getCellTextByHeading('Avg weight (g)', 'Wren')).toBe(
-				String(
-					Number(
-						speciesStatsRows
-							.find((row) => row.species_name === 'Wren')!
-							.avg_weight!.toFixed(1)
-					)
-				)
+				String(Number(wrenRow.avg_weight!.toFixed(1)))
 			);
 		});
 	});
 
-	describe('?tabId= query param', () => {
-		it('renders the core dataset tab active and loaded when no tabId is given', async () => {
+	describe('the Aggregate By toggle', () => {
+		it('defaults to bird-based counts and re-renders the counts columns from encounter-based data when "Encounter" is selected', async () => {
 			await renderComparePage({ name: ['Robin'] });
 
-			expect(
-				screen
-					.getByRole('button', { name: 'Core stats' })
-					.getAttribute('aria-current')
-			).toBe('true');
-			expect(
-				screen.getByRole('columnheader', { name: 'Encounters' })
-			).toBeTruthy();
-		});
+			expect(getCellTextByHeading('Adult', 'Robin')).toBe(
+				String(robinRow.adult_bird_count)
+			);
 
-		it('focuses the Biometrics tab and renders its columns without a click', async () => {
-			await renderComparePage({ name: ['Robin'], tabId: 'biometrics' });
+			selectEncounterAggregation();
 
-			expect(
-				screen
-					.getByRole('button', { name: 'Biometrics' })
-					.getAttribute('aria-current')
-			).toBe('true');
-			expect(
-				screen.getByRole('columnheader', { name: 'Avg weight (g)' })
-			).toBeTruthy();
-			expect(screen.queryByRole('columnheader', { name: 'Encounters' })).toBe(
-				null
+			expect(getCellTextByHeading('Adult', 'Robin')).toBe(
+				String(robinRow.adult_enc_count)
 			);
 		});
 
-		it('falls back to the core dataset for a tabId naming no real tab', async () => {
-			await renderComparePage({ name: ['Robin'], tabId: 'not-a-real-tab' });
+		it('disables the Aggregate By toggle while the Biometrics option is active', async () => {
+			await renderComparePage({ name: ['Robin'] });
 
-			expect(
-				screen
-					.getByRole('button', { name: 'Core stats' })
-					.getAttribute('aria-current')
-			).toBe('true');
-			expect(dataRowCount()).toBe(1);
-			expect(getCellTextByHeading('Encounters', 'Robin')).toBe(
-				String(robinRow.encounter_count)
+			selectBiometricsColumns();
+
+			expect(screen.getByRole('radio', { name: 'Bird' })).toHaveProperty(
+				'disabled',
+				true
 			);
-		});
-	});
-
-	describe('compareSpeciesTabs', () => {
-		it('declares both dataset tabs with no dataFetcher of their own', () => {
-			expect(
-				[compareSpeciesCoreTab, compareSpeciesBiometricsTab].map(
-					({ id, dataFetcher }) => [id, dataFetcher]
-				)
-			).toEqual([
-				['core', undefined],
-				['biometrics', undefined]
-			]);
+			expect(screen.getByRole('radio', { name: 'Encounter' })).toHaveProperty(
+				'disabled',
+				true
+			);
 		});
 	});
 });

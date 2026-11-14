@@ -2,18 +2,20 @@
  * Selection + URL plumbing for the species-comparison page (#115,
  * `/compare/species?name=x&name=y`).
  *
- * The page's whole state is which species are selected and which by-species
- * stats dataset is on show. Everything that reads or writes the species
- * selection's repeated `?name=` params (so a comparison can be
+ * The page's whole state is which species are selected and which counts/
+ * biometrics + aggregate-by view is on show. Everything that reads or writes
+ * the species selection's repeated `?name=` params (so a comparison can be
  * bookmarked/shared) lives here rather than in the page's client component —
  * the route's `page.tsx` needs the parse half on the server, the content
- * component needs the build/toggle halves on the client. The dataset half is
- * now plain `?tabId=` tab state, owned by `TabSet` and
- * `app/components/pages/compare-species/compare-species-tab-params.ts`.
+ * component needs the build/toggle halves on the client. The dataset-view
+ * half is local, un-persisted toggle state owned by `SpeciesComparisonTable`
+ * itself (`AggregateByToggle`/`CountsBiometricsToggle`, `modules/stats-view`)
+ * rather than anything URL-addressable.
  *
- * Deliberately free of React and of any table/column concerns: the column
- * definitions for each dataset live next to the components that render them
- * (`app/components/pages/compare-species/comparison-columns.ts`).
+ * Deliberately free of React and of any table/column concerns: column
+ * definitions live with the table component that renders them
+ * (`app/components/pages/compare-species/SpeciesComparisonTable.tsx`), built
+ * off `modules/stats-view`'s shared column-config helpers.
  */
 
 /** The repeated multi-value query-string param carrying the selection. */
@@ -70,10 +72,10 @@ export function toggleSpeciesSelection(
  * than a silently dropped row whose absence would make the table disagree with
  * the selection about how many species are being compared.
  *
- * Since #1412 the comparison page itself can't reach that case (both tabs read
- * the one row array the pill list is derived from, so a selected species always
- * has a row), but it remains part of this helper's contract for any caller
- * whose rows and selection come from different places.
+ * Since #1412 the comparison page itself can't reach that case (the table
+ * reads the one row array the pill list is derived from, so a selected
+ * species always has a row), but it remains part of this helper's contract
+ * for any caller whose rows and selection come from different places.
  */
 export type ComparisonRow<Row extends { species_name: string }> =
 	Partial<Row> & { species_name: string };

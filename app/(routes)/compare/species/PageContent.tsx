@@ -1,35 +1,21 @@
 'use client';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import {
-	PageWrapper,
-	PrimaryHeading,
-	Standfirst,
-	TabSet
-} from '@/modules/ui-kit';
-import { compareSpeciesBiometricsTab } from '@/app/components/pages/compare-species/CompareSpeciesBiometricsTab';
-import { compareSpeciesCoreTab } from '@/app/components/pages/compare-species/CompareSpeciesCoreTab';
-import type { CompareSpeciesTabParams } from '@/app/components/pages/compare-species/compare-species-tab-params';
+import { PageWrapper, PrimaryHeading, Standfirst } from '@/modules/ui-kit';
+import { SpeciesComparisonTable } from '@/app/components/pages/compare-species/SpeciesComparisonTable';
 import { SpeciesPillSelector } from '@/app/components/pages/compare-species/SpeciesPillSelector';
 import {
 	buildSpeciesComparisonQuery,
 	listAvailableSpecies,
+	selectComparisonRows,
 	toggleSpeciesSelection
 } from '@/app/lib/compare-species';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import type { CompareSpeciesPageData, CompareSpeciesParams } from './page';
 
-/**
- * The dataset toggle, as a `TabSet` tabs array. Homogeneous (both tabs take
- * the same `CompareSpeciesTabParams`), so it needs no `as const` to keep its
- * per-tab params types.
- */
-const compareSpeciesTabs = [compareSpeciesCoreTab, compareSpeciesBiometricsTab];
-
 export function CompareSpeciesPageContent({
 	params,
-	data,
-	viewedGroup
+	data
 }: {
 	params: CompareSpeciesParams;
 	data: CompareSpeciesPageData;
@@ -62,14 +48,6 @@ export function CompareSpeciesPageContent({
 		);
 	}
 
-	// Rebuilt every render so a pill tap re-renders whichever dataset tab is
-	// showing with the new selection — neither tab fetches, both read their
-	// rows straight off here (see `CompareSpeciesTabParams`).
-	const tabParams: CompareSpeciesTabParams = {
-		speciesStats: data.speciesStats,
-		selectedSpecies
-	};
-
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Compare species</PrimaryHeading>
@@ -81,13 +59,8 @@ export function CompareSpeciesPageContent({
 				selectedSpecies={selectedSpecies}
 				onToggle={handleSpeciesToggle}
 			/>
-			<TabSet
-				tabs={compareSpeciesTabs}
-				params={tabParams}
-				viewedGroup={viewedGroup}
-				initialTabId={params.activeTabId}
-				initialTabData={data.initialTabData}
-				ariaLabel="Dataset"
+			<SpeciesComparisonTable
+				rows={selectComparisonRows(data.speciesStats, selectedSpecies)}
 			/>
 		</PageWrapper>
 	);
