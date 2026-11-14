@@ -33,6 +33,7 @@ export function SpSessionTotalsTab({
 				`/group/${viewedGroup.slug}/session/${timePeriod}`
 			}
 			showBusiestSession={false}
+			showBiometricsToggle
 		/>
 	);
 }

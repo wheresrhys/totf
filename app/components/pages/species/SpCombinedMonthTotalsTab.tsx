@@ -94,6 +94,7 @@ export function SpCombinedMonthTotalsTab({
 					).map((row) => row.stats)}
 					firstColumnHeader="Month"
 					showSpeciesColumn={false}
+					showBiometricsToggle
 					// Links into the squashed-month species page (#1005) for this
 					// calendar month — no single year to drill into, but every
 					// occurrence of the month across the group's whole history.
@@ -112,6 +113,7 @@ export function SpCombinedMonthTotalsTab({
 				<PeriodTotalsTable
 					timeInterval="month"
 					showSpeciesColumn={false}
+					showBiometricsToggle
 					rows={filterEmptyMonthTotalsRows(perYearRows, hideEmptyMonths).map(
 						(row) => row.stats
 					)}

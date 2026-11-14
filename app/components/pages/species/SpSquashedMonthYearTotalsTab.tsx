@@ -62,6 +62,7 @@ export function SpSquashedMonthYearTotalsTab({
 			rows={yearTotalsRows.map((row) => row.stats)}
 			firstColumnHeader="Year"
 			showSpeciesColumn={false}
+			showBiometricsToggle
 			buildHref={(timePeriod) => {
 				const row = yearTotalsRowByTimePeriod.get(timePeriod);
 				return row

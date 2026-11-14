@@ -28,6 +28,7 @@ export function SpYearTotalsTab({
 			rows={yearTotals ?? []}
 			firstColumnHeader="Year"
 			showSpeciesColumn={false}
+			showBiometricsToggle
 			buildHref={(timePeriod) =>
 				`/species/${params.speciesName}/${timePeriod.slice(0, 4)}`
 			}
