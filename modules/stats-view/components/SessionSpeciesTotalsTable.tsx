@@ -184,10 +184,7 @@ export function SessionSpeciesTotalsTable({
 	return (
 		<>
 			<div data-test-id="above-header-row" className="m-2 flex gap-4">
-				<CountsBiometricsToggle
-					value={statsClass}
-					onChange={setStatsClass}
-				/>
+				<CountsBiometricsToggle value={statsClass} onChange={setStatsClass} />
 			</div>
 			<SortableTable<SpeciesWithEncounters, RowModel>
 				columnConfigs={columnConfigs}
