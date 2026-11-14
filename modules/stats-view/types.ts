@@ -7,9 +7,27 @@
 // file that needs it imports it directly from `@/modules/stats/browser` rather
 // than through this module.
 
-import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
+import type {
+	BiometricStatName,
+	StatsCacheBySpeciesResult
+} from '@/modules/stats/browser';
 
 export type PeriodTotalsGrouping = 'year' | 'month' | 'day';
+
+// Which class of stat a stats table's breakdown block is currently showing —
+// the age-bucket counts or the wing/weight biometrics. The named alternatives
+// rather than a `showBiometrics` boolean: every function that branches on it
+// reads as a comparison against a stat class, and a third class could be added
+// without rewriting the call sites (#1431 review).
+export type StatsClass = 'counts' | 'biometrics';
+
+// The 8 wing/weight stats `lib/session-species-biometrics.ts` derives
+// client-side from a session's raw encounters (#1431), keyed by the same
+// canonical `BiometricStatName`s the cached columns use so one
+// `buildBiometricColumnConfigs()` config set addresses either source. `null`
+// is the genuine "nothing measured" value for a stat, never zero — see that
+// file.
+export type SessionSpeciesBiometrics = Record<BiometricStatName, number | null>;
 
 // Field names for the age-class/capture-type block (`new`/`retraps`/`pullus`/
 // `juvs`/`postjuv`/`adults`/`unknownAge`) deliberately match

@@ -26,9 +26,10 @@ Like `modules/ui-kit` (which this module builds directly on top of) and unlike `
 this module is consumed only by `app/` — nothing else imports it. It's catalogued as a module
 because it's large enough to warrant its own directory/barrel/doc (and its own
 `zone:modules/stats-view` label), not because it's cross-zone, and
-it has no `browser.ts`/`index.ts` split: four of the five components are `'use client'` and the
-fifth (`SessionSpeciesTotalsTable`) is a plain Server Component, but none of the nine files imports
-a server-only dependency, so the single barrel is safe from either side of the boundary.
+it has no `browser.ts`/`index.ts` split: all five components are `'use client'`
+(`SessionSpeciesTotalsTable` was the one plain Server Component until #1431 gave it a
+`useState`-backed Counts/Biometrics toggle), but none of the files imports a server-only
+dependency, so the single barrel is safe from either side of the boundary.
 
 ## Sibling of `modules/stats`, not a child of it
 
@@ -56,13 +57,15 @@ one — four of the five components here are `'use client'` (see this module's o
 ```
 modules/stats-view/
   index.ts    # the single barrel — re-export-only. `MONTH_ABBREVIATIONS`
-              # (lib/squashed-month.ts) is deliberately not on it: no caller outside
-              # the module, the same treatment modules/stats gives
+              # (lib/squashed-month.ts) and `deriveSessionSpeciesBiometrics`
+              # (lib/session-species-biometrics.ts) are deliberately not on it: no
+              # caller outside the module, the same treatment modules/stats gives
               # runSimpleStatsCacheRefreshPass
-  types.ts    # the 4 types shared across more than one file in this module —
+  types.ts    # the 6 types shared across more than one file in this module —
               # PeriodTotalsGrouping, PeriodTotalsRow, SpeciesTotalsRow,
-              # SpeciesStatConfig. Before #1327 each lived in
-              # whichever helper derived it and was imported file-to-file from there
+              # SpeciesStatConfig, SessionSpeciesBiometrics, StatsClass. Before #1327
+              # each lived in whichever helper derived it and was imported
+              # file-to-file from there
   lib/
     period-totals.ts    # derivePeriodTotalsRowByBird / ...ByEncounter — one
                         # StatsResult (either grain) -> one PeriodTotalsRow, per the
@@ -71,6 +74,13 @@ modules/stats-view/
                         # calculateRetraps / calculateEncounterRetraps (the
                         # bird-count-minus-new-count derivation both tables and
                         # SummaryStatsSection use)
+    session-species-biometrics.ts  # deriveSessionSpeciesBiometrics — the 8 wing/weight
+                        # stats for a set of SessionEncounters, computed client-side from
+                        # each encounter's raw weight/wing_length (#1431). The one stats
+                        # table whose rows the cache can't answer for: they're scoped by
+                        # capture_method, a grain nothing materializes. Null-on-empty
+                        # (never zero) and an interpolating PERCENTILE_CONT(0.5) median,
+                        # matching the SQL layer's own convention for those columns
     species-stats.ts    # speciesStatConfigs — the /species list page's column set, the
                         # file's only export since #1418 deleted mergeSpeciesBiometrics
                         # (the counts/wing-weight rejoin, callerless since #1415) and the
@@ -84,14 +94,25 @@ modules/stats-view/
                                  # toggle (moved from modules/ui-kit, #1353)
     EmptyMonthsToggle.tsx       # EmptyMonthsToggle — show/hide empty-month rows
                                  # toggle (moved from modules/ui-kit, #1353)
+    CountsBiometricsToggle.tsx  # CountsBiometricsToggle — age-bucket counts vs
+                                 # wing/weight biometrics toggle for a stats table's
+                                 # breakdown block (#1433). Its value is the
+                                 # `StatsClass` union ('counts' | 'biometrics'), not a
+                                 # `showBiometrics` boolean, so a caller's state and
+                                 # the column-building functions it feeds all name the
+                                 # stat class outright (#1431 review)
     StatsTableBody.tsx          # createStatsTableBody — factory for a SortableTable
                                  # TableBodyComponent, flat or accordion depending on
                                  # whether an ExpandedContentComponent is supplied
-                                 # (moved from modules/ui-kit, #1353)
-    StatsTableColumnConfigs.tsx # buildStandardColumnConfigs/buildTotalsRowCells —
-                                 # the shared age-bucket column set (New/Retrap/Pulli/
-                                 # Juv/Postjuv/Adult/Unaged) and its colour-blocking
-                                 # (columnBlock) and totals row (moved from
+                                 # (moved from modules/ui-kit, #1353). Applies each
+                                 # column config's formatter to its data cells, as
+                                 # buildTotalsRowCells does to the totals row (#1431)
+    StatsTableColumnConfigs.tsx # buildStandardColumnConfigs/buildBiometricColumnConfigs/
+                                 # buildTotalsRowCells — the shared age-bucket column set
+                                 # (New/Retrap/Pulli/Juv/Postjuv/Adult/Unaged) and its
+                                 # colour-blocking (columnBlock), the 8 wing/weight
+                                 # columns the Counts/Biometrics toggle switches to
+                                 # (#1433), and the totals row (moved from
                                  # modules/ui-kit, #1353)
     __tests__/          # one test per helper above except species-stats.ts (whose only
                         # export is a column-config list tsc already proves, #1418),
@@ -105,16 +126,21 @@ modules/stats-view/
                                      # summary pages' Species totals tab
       SessionSpeciesTotalsTable.tsx # one row per species within one session, with
                                      # an expandable per-species encounters drill-down;
-                                     # shared by the Mist-netting and Other catches tabs
+                                     # shared by the Mist-netting and Other catches tabs.
+                                     # Its Counts/Biometrics toggle (#1431) switches the
+                                     # breakdown block between the age buckets +
+                                     # Max Proven Age and the 8 client-side-derived
+                                     # wing/weight stats
       SppStatsTable.tsx             # the /species list page's whole table including
                                      # its year/CES/date-range filter form
       SpTable.tsx                   # one row per individual bird of one species, with
                                      # an expandable per-bird encounters drill-down
-      __tests__/                    # PeriodTotalsTable, SpeciesTotalsTable and
-                                     # SppStatsTable have one; SessionSpeciesTotalsTable
-                                     # and SpTable have none (#1327 added no new tests —
-                                     # the former is covered indirectly through
-                                     # SessionMistNettingTab/SessionOtherCatchesTab)
+      __tests__/                    # PeriodTotalsTable, SpeciesTotalsTable,
+                                     # SppStatsTable and — since #1431 gave it a
+                                     # mode-dependent column set —
+                                     # SessionSpeciesTotalsTable have one; SpTable has
+                                     # none (#1327 added no new tests, and it's covered
+                                     # indirectly through the pages that render it)
 ```
 
 ## What it imports from outside the module
@@ -170,3 +196,10 @@ module. `__tests__/index.test.ts` is the one test belonging to the module as a w
 any single file — a barrel regression guard scoped to the five names that moved in from
 `modules/ui-kit` (#1353), mirroring that module's own `index.test.ts`; it doesn't attempt to
 cover this module's pre-existing exports.
+
+`components/__tests__/SessionSpeciesTotalsTable.test.tsx` is the one test here that renders an
+`app/` component — it mounts `SessionMistNettingTab`/`SessionOtherCatchesTab` for its last two
+cases, since "both session tabs get the toggle" is a claim about those tabs and not about this
+table. That's an inward import of an `app/` leaf, the same direction every source file here
+already takes (see "What it imports from outside the module"), not a reach past another module's
+barrel.

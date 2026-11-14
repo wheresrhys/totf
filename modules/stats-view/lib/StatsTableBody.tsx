@@ -1,7 +1,8 @@
 import {
 	type ColumnConfig,
 	type RowModelWithRawData,
-	AccordionTableBody
+	AccordionTableBody,
+	getFormattedValue
 } from '@/modules/ui-kit';
 
 // A component rendering a single row's model — used for the first-column cell
@@ -49,6 +50,13 @@ export function createStatsTableBody<RawRowData, RowModel>({
 			(property) => property !== firstColumnKey
 		) as (keyof RowModel)[];
 
+		// A column config's own `formatter` decides how its value prints, exactly
+		// as `buildTotalsRowCells` already applies it to the pinned totals row —
+		// so a formatted column (e.g. the biometric blocks's 1dp-or-em-dash
+		// wing/weight stats) reads the same in the data rows and the totals row.
+		// An unformatted column's raw value passes straight through, unchanged.
+		const formatCell = getFormattedValue<RowModel>(columnConfigs ?? {});
+
 		function RestColumns({
 			model
 		}: {
@@ -59,7 +67,7 @@ export function createStatsTableBody<RawRowData, RowModel>({
 					key={property as string}
 					className={columnConfigs?.[property]?.cellClassName}
 				>
-					{model[property] as React.ReactNode}
+					{formatCell(model[property], property) as React.ReactNode}
 				</td>
 			));
 		}

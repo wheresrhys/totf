@@ -6,7 +6,7 @@ testTwoOptionToggle({
 	renderToggle: (props) => <CountsBiometricsToggle {...props} />,
 	labelText: 'Columns:',
 	options: [
-		{ value: false, label: 'Counts' },
-		{ value: true, label: 'Biometrics' }
+		{ value: 'counts', label: 'Counts' },
+		{ value: 'biometrics', label: 'Biometrics' }
 	]
 });
