@@ -66,9 +66,9 @@ export type GroupSummaryAccessLevel = 'own' | 'shared' | 'public' | 'blocked';
  *
  * Optional rather than required because only a by-species read has one: the
  * all-species-combined cache table carries no `species_id` column at all, and
- * an ungrouped live recompute returns a literal `null` for it. Nothing but the
- * `/species` list page's merge reads it; every other consumer of these rows
- * reads `species_name`.
+ * an ungrouped live recompute returns a literal `null` for it. Nothing but
+ * `spp-data.ts`'s arbitrary-window biometrics merge reads it; every other
+ * consumer of these rows reads `species_name`.
  */
 export type AuthorisedStatsRow<BySpecies extends boolean = boolean> =
 	StatsResultFor<BySpecies> & {
@@ -181,11 +181,12 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  *    buckets) cannot be recomputed by summing finer cells: a bird caught on
  *    two days is one bird but two day-cells. The windows that do line up are
  *    every one the summary pages ask for — all time, a whole calendar year, a
- *    whole calendar month, and a squashed calendar month — and they cover the
- *    `/species` list page's default and year-select views too.
+ *    whole calendar month, and a squashed calendar month — which is every
+ *    window any page actually asks for since the `/species` list page's two
+ *    free-text date inputs were deleted with it (#1434).
  *
- *    Returning `null` therefore means "arbitrary window": the `/species` list
- *    page's two free-text date inputs are the only thing that produces one.
+ *    Returning `null` therefore means "arbitrary window", which no UI
+ *    produces today — those two date inputs were the only source.
  *    For *this* function's own caller — the counts half — that keeps reading
  *    a live `stats_cache_basic_session_metrics` recompute (#1244 — it used to
  *    be `core_stats`/`public_core_stats`, which nothing here calls any more).
@@ -193,7 +194,7 @@ function isWholeCalendarMonth(fromDate: string, toDate: string): boolean {
  *    stays until either the cache gains an arbitrary-window grain or those
  *    two inputs are reshaped to cache-aligned ones.
  *
- * Exported because the `/species` list page's *other* half —
+ * Exported because a by-species read's *other* half —
  * `fetchSpeciesRowsWithBiometrics` (`app/actions/spp-data.ts`), which sources
  * the 8 wing/weight columns for the same window — has to split exactly the same way
  * and must stay in lockstep with this one (#1223). It has its own,
@@ -433,8 +434,8 @@ const UNAVAILABLE_COLUMN_PLACEHOLDERS = {
 >;
 
 /**
- * The arbitrary-window fallback for the counts half of the `/species` list
- * page: a live recompute by `stats_cache_basic_session_metrics` instead of
+ * The arbitrary-window fallback for a read's counts half: a live recompute by
+ * `stats_cache_basic_session_metrics` instead of
  * the retired `core_stats`/`public_core_stats` RPC pair (#1244), following
  * the exact precedent `app/actions/spp-data.ts`'s
  * `mergeLiveBiometricsIntoCountsRows` already set for the biometrics half. That

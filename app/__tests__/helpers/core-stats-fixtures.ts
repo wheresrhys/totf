@@ -84,7 +84,7 @@ export function buildCoreStatsRow(
 /**
  * The by-species grain of `buildCoreStatsRow` (#1424): the same columns with a
  * real `species_name`, for a test feeding a `StatsCacheBySpeciesResult` slot —
- * a species-filtered cache read, the `/species` list page's rows, or anything
+ * a species-filtered cache read, the summary Species tab's rows, or anything
  * `deriveSpeciesTotalsRow` consumes. Named for the grain rather than for a
  * species, since `species_name` is just another override; the default is a
  * species that exists in the seed data so a rendered name is recognisable.
