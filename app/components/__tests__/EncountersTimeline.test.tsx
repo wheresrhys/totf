@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { EncountersTimeline } from '../EncountersTimeline';
+import {
+	EncountersTimeline,
+	getQuarterCollapseThresholdPx
+} from '../EncountersTimeline';
 import type { EncounterOfBird } from '@/app/models/bird';
 
 function buildEncounter(
@@ -59,6 +62,59 @@ describe('EncountersTimeline', () => {
 			expect(innerRow?.className).toContain('relative');
 			expect(innerRow?.className).toContain('flex');
 			expect(innerRow?.className).toContain('min-w-max');
+		});
+	});
+
+	describe('quarter collapse on narrow containers', () => {
+		it('renders 4 unlabelled quarter spans alongside the 12 labelled month spans', () => {
+			const { container } = render(
+				<EncountersTimeline
+					encounters={[new Date(2020, 0, 1)]}
+					minYear={2020}
+					maxYear={2020}
+				/>
+			);
+
+			// happy-dom can't evaluate @container visibility — both rows are
+			// structurally present in the DOM regardless of which one the
+			// container-query rule currently shows; Playwright covers the
+			// actual visual switch (e2e/authenticated/bird-encounters-timeline.spec.ts).
+			const monthsRow = container.querySelector('.timeline-months');
+			const quartersRow = container.querySelector('.timeline-quarters');
+			expect(monthsRow).not.toBeNull();
+			expect(quartersRow).not.toBeNull();
+
+			const monthSpans = monthsRow!.querySelectorAll('span');
+			expect(monthSpans).toHaveLength(12);
+			expect(Array.from(monthSpans).map((span) => span.textContent)).toEqual([
+				'J',
+				'F',
+				'M',
+				'A',
+				'M',
+				'J',
+				'J',
+				'A',
+				'S',
+				'O',
+				'N',
+				'D'
+			]);
+
+			const quarterSpans = quartersRow!.querySelectorAll('span');
+			expect(quarterSpans).toHaveLength(4);
+			Array.from(quarterSpans).forEach((span) => {
+				expect(span.textContent).toBe('');
+			});
+		});
+
+		it('computes a larger collapse threshold for a bird spanning more years', () => {
+			const oneYearThreshold = getQuarterCollapseThresholdPx(1);
+			const fourYearThreshold = getQuarterCollapseThresholdPx(4);
+			const eightYearThreshold = getQuarterCollapseThresholdPx(8);
+
+			expect(fourYearThreshold).toBeGreaterThan(oneYearThreshold);
+			expect(eightYearThreshold).toBeGreaterThan(fourYearThreshold);
 		});
 	});
 
