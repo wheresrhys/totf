@@ -31,7 +31,10 @@ function Detail({ model }: { model: Row }) {
 	return <div data-testid="detail">{model._rawRowData.detail}</div>;
 }
 
-const makeRow = (name: string, count: number, detail: string): Row =>
+// `count` admits null so a test can exercise a formatter's missing-value
+// branch, which is the shape a real nullable column (e.g. a biometric stat)
+// has in its row model.
+const makeRow = (name: string, count: number | null, detail: string): Row =>
 	({ name, count, _rawRowData: { detail } }) as Row;
 
 const rows = [
@@ -43,11 +46,12 @@ const rows = [
 // mount it inside a <table> to keep the DOM valid.
 function renderBody(
 	Body: ReturnType<typeof createStatsTableBody<Raw, Model>>,
-	data: Row[]
+	data: Row[],
+	configs: Partial<Record<keyof Model, ColumnConfig>> = columnConfigs
 ) {
 	return render(
 		<table>
-			<Body data={data} columnConfigs={columnConfigs} />
+			<Body data={data} columnConfigs={configs} />
 		</table>
 	);
 }
@@ -143,6 +147,36 @@ describe('createStatsTableBody', () => {
 			renderBody(accordionBody, []);
 			expect(screen.queryAllByRole('row')).toHaveLength(0);
 			expect(screen.queryByRole('button')).toBeNull();
+		});
+	});
+
+	describe('column formatters (#1431)', () => {
+		// The body shares one `RestColumns` between flat and accordion mode, so
+		// formatting is covered once rather than per mode.
+		const formattedConfigs: Partial<Record<keyof Model, ColumnConfig>> = {
+			name: { label: 'Name' },
+			count: {
+				label: 'Count',
+				formatter: (value) => (value === null ? '—' : `${value} birds`)
+			}
+		};
+
+		it("renders a data cell through its column config's formatter when it has one", () => {
+			renderBody(flatBody, rows, formattedConfigs);
+			const robinRow = getRowByText('Robin');
+			expect(within(robinRow).getAllByRole('cell')[1].textContent).toBe(
+				'3 birds'
+			);
+		});
+
+		it('passes a null value to the formatter rather than rendering an empty cell', () => {
+			renderBody(
+				flatBody,
+				[makeRow('Robin', null, 'robin-detail')],
+				formattedConfigs
+			);
+			const robinRow = getRowByText('Robin');
+			expect(within(robinRow).getAllByRole('cell')[1].textContent).toBe('—');
 		});
 	});
 });

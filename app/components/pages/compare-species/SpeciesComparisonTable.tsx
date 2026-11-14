@@ -15,11 +15,10 @@ import {
  * (`comparison-columns.ts`).
  *
  * Built on the shared `SortableTable` so the comparison is sortable by any
- * column for free. Its own body component (rather than
- * `createStatsTableBody`) because these columns need their `formatter`s
- * applied — `createStatsTableBody` renders raw values, which would print
- * Postgres interval strings verbatim and leave a missing measurement as an
- * empty cell.
+ * column for free. Its own body component (rather than `createStatsTableBody`)
+ * because it has no drill-down rows to expand and a bare species link rather
+ * than a configurable first-column component — not because of formatting:
+ * `createStatsTableBody` applies each column's `formatter` too, as of #1431.
  */
 export function SpeciesComparisonTable<
 	RowModel extends { species_name: string }

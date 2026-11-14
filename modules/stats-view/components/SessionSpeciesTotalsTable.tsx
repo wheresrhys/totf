@@ -1,11 +1,18 @@
+'use client';
+
+import { useState } from 'react';
 import { getAgeClass } from '@/app/models/encounter';
 import type { SpeciesWithEncounters } from '@/app/models/session';
 import {
+	buildBiometricColumnConfigs,
 	buildStandardColumnConfigs,
 	buildTotalsRowCells,
 	createNameLinkCell
 } from '../lib/StatsTableColumnConfigs';
 import { createStatsTableBody } from '../lib/StatsTableBody';
+import { CountsBiometricsToggle } from '../lib/CountsBiometricsToggle';
+import { deriveSessionSpeciesBiometrics } from '../lib/session-species-biometrics';
+import type { SessionSpeciesBiometrics, StatsClass } from '../types';
 import {
 	SortableTable,
 	type ColumnConfig,
@@ -49,8 +56,11 @@ type RowModel = {
 	postjuv: number;
 	unknownAge: number;
 	maxProvenAge: number;
-};
+} & SessionSpeciesBiometrics;
 
+// Both the age-bucket counts and the wing/weight biometrics are derived for
+// every row, whichever block of columns is currently rendered — the toggle
+// below switches the *columns*, not the aggregation.
 function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 	return {
 		species: data.species,
@@ -76,14 +86,20 @@ function rowDataTransform(data: SpeciesWithEncounters): RowModel {
 			.length,
 		maxProvenAge: Math.max(
 			...data.encounters.map((encounter) => encounter.bird.proven_age)
-		)
+		),
+		...deriveSessionSpeciesBiometrics(data.encounters)
 	};
 }
 
+// `species` and `total` head the table in either mode; what follows them is
+// the whole of what the Counts/Biometrics toggle switches. `maxProvenAge` is a
+// counts-mode column only — it is neither a count nor a biometric, but it
+// belongs with the per-age-class breakdown rather than alongside wing/weight.
 function buildColumnConfigs(
-	hasPulli: boolean
+	hasPulli: boolean,
+	statsClass: StatsClass
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
-	return {
+	const leadingColumns = {
 		species: {
 			label: 'Species',
 			preferSortAscending: true
@@ -91,12 +107,41 @@ function buildColumnConfigs(
 		total: {
 			label: 'Total',
 			cellClassName: 'font-bold'
-		},
-		...buildStandardColumnConfigs<RowModel>(hasPulli),
-		maxProvenAge: {
-			label: 'Max Proven Age'
 		}
 	};
+	return statsClass === 'biometrics'
+		? {
+				...leadingColumns,
+				...buildBiometricColumnConfigs()
+			}
+		: {
+				...leadingColumns,
+				...buildStandardColumnConfigs<RowModel>(hasPulli),
+				maxProvenAge: {
+					label: 'Max Proven Age'
+				}
+			};
+}
+
+// The totals row sums each column across the rows by default, which is right
+// for counts and wrong for every biometric stat — a session-wide median is not
+// the sum (nor the mean) of its species' medians. So both modes override the
+// columns that need re-deriving from the underlying encounters rather than
+// reducing over the row models.
+function buildTotalsCellOverrides(
+	speciesList: SpeciesWithEncounters[],
+	rowModels: RowModel[],
+	statsClass: StatsClass
+): Partial<Record<keyof RowModel, React.ReactNode>> {
+	return statsClass === 'biometrics'
+		? deriveSessionSpeciesBiometrics(
+				speciesList.flatMap(
+					(speciesWithEncounters) => speciesWithEncounters.encounters
+				)
+			)
+		: {
+				maxProvenAge: Math.max(...rowModels.map((model) => model.maxProvenAge))
+			};
 }
 
 const SessionTableBody = createStatsTableBody<SpeciesWithEncounters, RowModel>({
@@ -120,30 +165,36 @@ export function SessionSpeciesTotalsTable({
 	speciesList: SpeciesWithEncounters[];
 	testId: string;
 }) {
+	// Local to this table, like `SpeciesTotalsTable`'s own "Aggregate by" state
+	// (#604) — each tab's instance toggles independently and resets on remount.
+	const [statsClass, setStatsClass] = useState<StatsClass>('counts');
 	const hasPulli = speciesList.some((speciesWithEncounters) =>
 		speciesWithEncounters.encounters.some(
 			(encounter) => getAgeClass(encounter) === 'pullus'
 		)
 	);
-	const columnConfigs = buildColumnConfigs(hasPulli);
+	const columnConfigs = buildColumnConfigs(hasPulli, statsClass);
 	const rowModels = speciesList.map(rowDataTransform);
 	const totalsRow = buildTotalsRowCells<RowModel>({
 		columnConfigs,
 		rowModels,
-		cellOverrides: {
-			maxProvenAge: Math.max(...rowModels.map((model) => model.maxProvenAge))
-		}
+		cellOverrides: buildTotalsCellOverrides(speciesList, rowModels, statsClass)
 	});
 
 	return (
-		<SortableTable<SpeciesWithEncounters, RowModel>
-			columnConfigs={columnConfigs}
-			data={speciesList}
-			testId={testId}
-			initialSortColumn="total"
-			rowDataTransform={rowDataTransform}
-			totalsRow={totalsRow}
-			TableBodyComponent={SessionTableBody}
-		/>
+		<>
+			<div data-test-id="above-header-row" className="m-2 flex gap-4">
+				<CountsBiometricsToggle value={statsClass} onChange={setStatsClass} />
+			</div>
+			<SortableTable<SpeciesWithEncounters, RowModel>
+				columnConfigs={columnConfigs}
+				data={speciesList}
+				testId={testId}
+				initialSortColumn="total"
+				rowDataTransform={rowDataTransform}
+				totalsRow={totalsRow}
+				TableBodyComponent={SessionTableBody}
+			/>
+		</>
 	);
 }
