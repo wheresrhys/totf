@@ -54,7 +54,7 @@ describe('SpeciesTotalsTable', () => {
 				'Sessions',
 				'Encounters',
 				'Busiest session',
-				'Individuals',
+				'Birds',
 				'New',
 				'Retrap',
 				'Pulli',
@@ -200,7 +200,7 @@ describe('SpeciesTotalsTable', () => {
 		});
 
 		it('switches the active sort column when a different header is clicked', () => {
-			const statsWithIndividuals = [
+			const statsWithBirdCounts = [
 				makeStat({ species_name: 'Robin', encounter_count: 5, bird_count: 1 }),
 				makeStat({ species_name: 'Wren', encounter_count: 12, bird_count: 9 }),
 				makeStat({
@@ -209,11 +209,11 @@ describe('SpeciesTotalsTable', () => {
 					bird_count: 4
 				})
 			];
-			render(<SpeciesTotalsTable speciesStats={statsWithIndividuals} />);
+			render(<SpeciesTotalsTable speciesStats={statsWithBirdCounts} />);
 			fireEvent.click(screen.getByText('Encounters'));
-			fireEvent.click(screen.getByText('Individuals'));
+			fireEvent.click(screen.getByText('Birds'));
 			const rows = document.querySelectorAll('tbody tr');
-			// descending by Individuals: Wren (9), Blue Tit (4), Robin (1)
+			// descending by Birds: Wren (9), Blue Tit (4), Robin (1)
 			expect(rows[0].textContent).toContain('Wren');
 			expect(rows[1].textContent).toContain('Blue Tit');
 			expect(rows[2].textContent).toContain('Robin');
@@ -488,13 +488,13 @@ describe('SpeciesTotalsTable', () => {
 			expect(getCellTextByHeading('Adult', 0)).toBe('1'); // from adult_enc_count
 		});
 
-		it('leaves the Species/Sessions/Encounters/Individuals columns unaffected by the toggle', () => {
+		it('leaves the Species/Sessions/Encounters/Birds columns unaffected by the toggle', () => {
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			const unaffectedHeadings = [
 				'Species',
 				'Sessions',
 				'Encounters',
-				'Individuals'
+				'Birds'
 			];
 			const before = unaffectedHeadings.map((heading) =>
 				getCellTextByHeading(heading, 0)
@@ -533,12 +533,12 @@ describe('SpeciesTotalsTable', () => {
 		const BIOMETRIC_HEADINGS = [
 			'Max weight (g)',
 			'Avg weight (g)',
-			'Min weight (g)',
 			'Median weight (g)',
+			'Min weight (g)',
 			'Max wing (mm)',
 			'Avg wing (mm)',
-			'Min wing (mm)',
-			'Median wing (mm)'
+			'Median wing (mm)',
+			'Min wing (mm)'
 		];
 		const AGE_BUCKET_HEADINGS = [
 			'New',
@@ -603,6 +603,34 @@ describe('SpeciesTotalsTable', () => {
 			);
 		});
 
+		it('renders the biometrics-mode columns in full, with each measurement ordered Max, Avg, Median, Min', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			expect(getColumnHeaders().map((header) => header.textContent)).toEqual([
+				'Species',
+				'Sessions',
+				'Encounters',
+				...BIOMETRIC_HEADINGS
+			]);
+		});
+
+		it('tints the weight columns purple and the wing columns green, graduated from Max down to Min', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			const headers = getColumnHeaders();
+			const headerClassName = (label: string) =>
+				headers.find((header) => header.textContent === label)?.className;
+
+			expect(headerClassName('Max weight (g)')).toContain('bg-purple-300');
+			expect(headerClassName('Min weight (g)')).toContain('bg-purple-50');
+			expect(headerClassName('Max wing (mm)')).toContain('bg-green-300');
+			expect(headerClassName('Min wing (mm)')).toContain('bg-green-50');
+			// The tint reaches the data cells too, not just the header.
+			expect(getCellByHeading('Max weight (g)', 0).className).toContain(
+				'bg-purple-300'
+			);
+		});
+
 		it("renders each row's biometric values from the underlying StatsCacheBySpeciesResult fields in biometrics mode", () => {
 			render(<SpeciesTotalsTable speciesStats={stats} />);
 			switchToBiometricsMode();
@@ -622,15 +650,9 @@ describe('SpeciesTotalsTable', () => {
 			expect(getCellTextByHeading('Max weight (g)', 1)).toBe('—');
 		});
 
-		it('leaves the Species/Sessions/Encounters/Busiest session/Individuals columns and their values unaffected by switching modes', () => {
+		it('leaves the Species/Sessions/Encounters columns and their values unaffected by switching modes', () => {
 			render(<SpeciesTotalsTable speciesStats={stats} />);
-			const unaffectedHeadings = [
-				'Species',
-				'Sessions',
-				'Encounters',
-				'Busiest session',
-				'Individuals'
-			];
+			const unaffectedHeadings = ['Species', 'Sessions', 'Encounters'];
 			const before = unaffectedHeadings.map((heading) =>
 				getCellTextByHeading(heading, 0)
 			);
@@ -641,6 +663,23 @@ describe('SpeciesTotalsTable', () => {
 				getCellTextByHeading(heading, 0)
 			);
 			expect(after).toEqual(before);
+		});
+
+		it('hides the Busiest session and Birds columns in biometrics mode, since neither is a biometric', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			const headings = getColumnHeaders().map((header) => header.textContent);
+			expect(headings).not.toContain('Busiest session');
+			expect(headings).not.toContain('Birds');
+		});
+
+		it('restores the Busiest session and Birds columns when toggled back to counts mode', () => {
+			render(<SpeciesTotalsTable speciesStats={stats} />);
+			switchToBiometricsMode();
+			fireEvent.click(screen.getByRole('radio', { name: 'Counts' }));
+			const headings = getColumnHeaders().map((header) => header.textContent);
+			expect(headings).toContain('Busiest session');
+			expect(headings).toContain('Birds');
 		});
 
 		it('switches back to the age-bucket block when toggled back to counts mode', () => {

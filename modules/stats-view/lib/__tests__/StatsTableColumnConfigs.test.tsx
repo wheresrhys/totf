@@ -276,9 +276,23 @@ describe('buildTotalsRowCells', () => {
 
 describe('buildBiometricColumnConfigs', () => {
 	describe('column set', () => {
-		it('returns one ColumnConfig for each of the 8 BiometricStatName values', () => {
+		it('returns one ColumnConfig for each of the 8 BiometricStatName values, and no others', () => {
 			const configs = buildBiometricColumnConfigs();
-			expect(Object.keys(configs)).toEqual([...BiometricStatNames]);
+			expect(Object.keys(configs).sort()).toEqual([...BiometricStatNames].sort());
+		});
+
+		it('orders each measurement\'s columns Max, Avg, Median, Min, weight group before wing', () => {
+			const configs = buildBiometricColumnConfigs();
+			expect(Object.keys(configs)).toEqual([
+				'max_weight',
+				'avg_weight',
+				'median_weight',
+				'min_weight',
+				'max_wing',
+				'avg_wing',
+				'median_wing',
+				'min_wing'
+			]);
 		});
 
 		it('labels each column with its stat name, Max/Avg/Min/Median phrasing and unit, e.g. "Max weight (g)" / "Median wing (mm)"', () => {
@@ -291,6 +305,49 @@ describe('buildBiometricColumnConfigs', () => {
 			expect(configs.avg_wing?.label).toBe('Avg wing (mm)');
 			expect(configs.min_wing?.label).toBe('Min wing (mm)');
 			expect(configs.median_wing?.label).toBe('Median wing (mm)');
+		});
+	});
+
+	describe('column tinting', () => {
+		it('tints the weight columns purple and the wing columns green', () => {
+			const configs = buildBiometricColumnConfigs();
+			expect(configs.avg_weight?.headerClassName).toContain('bg-purple-');
+			expect(configs.avg_wing?.headerClassName).toContain('bg-green-');
+		});
+
+		it('graduates each hue from the most saturated shade at Max to the faintest at Min', () => {
+			const configs = buildBiometricColumnConfigs();
+			expect(configs.max_weight?.headerClassName).toBe(
+				'bg-purple-300 dark:bg-purple-700'
+			);
+			expect(configs.avg_weight?.headerClassName).toBe(
+				'bg-purple-200 dark:bg-purple-800'
+			);
+			expect(configs.median_weight?.headerClassName).toBe(
+				'bg-purple-100 dark:bg-purple-900'
+			);
+			expect(configs.min_weight?.headerClassName).toBe(
+				'bg-purple-50 dark:bg-purple-950'
+			);
+		});
+
+		it('applies the same stat level shades to the wing hue', () => {
+			const configs = buildBiometricColumnConfigs();
+			expect(configs.max_wing?.headerClassName).toBe(
+				'bg-green-300 dark:bg-green-700'
+			);
+			expect(configs.min_wing?.headerClassName).toBe(
+				'bg-green-50 dark:bg-green-950'
+			);
+		});
+
+		it('tints every column header and its data cells identically', () => {
+			const configs = buildBiometricColumnConfigs();
+			BiometricStatNames.forEach((statName) => {
+				expect(configs[statName]?.cellClassName).toBe(
+					configs[statName]?.headerClassName
+				);
+			});
 		});
 	});
 

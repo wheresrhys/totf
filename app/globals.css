@@ -4,7 +4,7 @@
 @import 'flyonui/variants.css';
 @source "./node_modules/flyonui/flyonui.js";
 
-/* `columnBlock` (modules/ui-kit/lib/StatsTableColumnConfigs.tsx) composes
+/* `columnBlock` (modules/stats-view/lib/StatsTableColumnConfigs.tsx) composes
    `bg-<color>-50 dark:bg-<color>-950` from a base colour name at runtime, so
    the concrete class names never appear as literal text anywhere in the
    source for Tailwind's file scanner to pick up. `@source inline(...)`
@@ -14,6 +14,14 @@
    (issue #605). */
 @source inline('bg-{green,amber,cyan,sky,blue,purple,taupe,lime}-50');
 @source inline('dark:bg-{green,amber,cyan,sky,blue,purple,taupe,lime}-950');
+
+/* `biometricColumnBlock` (same file) tints the wing/weight biometric columns
+   the same way, but graduated over four shades per hue instead of one - weight
+   purple, wing green - so Max reads as the most saturated column and Min the
+   faintest. Same scanner blind spot, so the whole ramp is safelisted too; keep
+   it in sync with that file's `BIOMETRIC_STAT_SHADES` (issue #1430). */
+@source inline('bg-{purple,green}-{50,100,200,300}');
+@source inline('dark:bg-{purple,green}-{700,800,900,950}');
 
 @theme {
 	/* Not part of Tailwind's default palette - added for the "Unaged" column
