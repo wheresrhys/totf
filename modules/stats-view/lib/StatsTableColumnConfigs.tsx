@@ -219,15 +219,15 @@ export function buildTotalsRowCells<RowModel>(
 }
 
 // Em dash placeholder for a biometric cell with no value — a species/period
-// with no biometric-eligible encounters, or any non-numeric input. Mirrors
-// `app/components/pages/compare-species/comparison-columns.ts`'s
-// `MISSING_VALUE` convention exactly, so the two tables read the same way.
+// with no biometric-eligible encounters, or any non-numeric input. Every
+// stats table that renders a biometric column (including the
+// species-comparison page's, which builds its columns from this file
+// directly rather than keeping its own copy) reads the same way.
 const MISSING_BIOMETRIC_VALUE = '—';
 
-// Formats a biometric cell value to 1 decimal place, matching
-// `comparison-columns.ts`'s `formatMeasurement` exactly (including its
-// round-trip through `Number()`, which drops a trailing ".0"). Anything that
-// isn't a `number` (including `null`, the genuine "no biometric-eligible
+// Formats a biometric cell value to 1 decimal place (including a round-trip
+// through `Number()`, which drops a trailing ".0"). Anything that isn't a
+// `number` (including `null`, the genuine "no biometric-eligible
 // encounters" case) renders as an em dash.
 function formatBiometricValue(value: unknown): string {
 	return typeof value === 'number'
@@ -298,9 +298,10 @@ function biometricColumnBlock(
 // `BiometricStatNames`' own order, since that array is a canonical field list
 // with no say in presentation; its 8 names are still exactly what the
 // composition can produce, which `tsc` checks and the key-set test guards.
-// Label/formatting copies `comparison-columns.ts`'s `biometricsComparisonColumns`/
-// `formatMeasurement` convention exactly, for consistency between the two
-// tables that now render the same 8 columns.
+// Label/formatting is the one shared convention every stats table's
+// biometrics block uses — the species-comparison page included, since it
+// builds its columns from this function directly rather than keeping its own
+// copy.
 export function buildBiometricColumnConfigs(): Partial<
 	Record<BiometricStatName, ColumnConfig>
 > {

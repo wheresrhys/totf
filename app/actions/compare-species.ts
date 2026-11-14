@@ -21,11 +21,11 @@ import type { ViewedGroup } from '@/app/lib/group-slug';
  * PostgREST page used to lose the overflow silently).
  *
  * One array of whole cache rows comes back, not a
- * `{ coreStats, biometricsStats }` pair: the page's two tabs are two *column
- * sets* over the same rows (see `comparison-columns.ts`), and the cache table
- * carries both metric families' columns on every row, so splitting each row in
- * two was pure ceremony. The reader always `select('*')`s, so each row is a
- * superset of `StatsCacheBySpeciesResult` — the extra raw cache columns (`id`,
+ * `{ coreStats, biometricsStats }` pair: the page's Counts/Biometrics toggle
+ * (`SpeciesComparisonTable`) is just two *column sets* over the same rows, and
+ * the cache table carries both metric families' columns on every row, so
+ * splitting each row in two was pure ceremony. The reader always `select('*')`s,
+ * so each row is a superset of `StatsCacheBySpeciesResult` — the extra raw cache columns (`id`,
  * `group_id`, `species_id`, `temporal_unit`) ride along unread, the same
  * narrowing `app/actions/sp-data.ts`'s `fetchSpeciesStatsCacheRows` does.
  *

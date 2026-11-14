@@ -1,79 +1,36 @@
 import { fetchSpeciesComparisonStats } from '@/app/actions/compare-species';
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
 import type { StatsCacheBySpeciesResult } from '@/modules/stats/browser';
-import { type TabConfig } from '@/modules/ui-kit';
-import {
-	COMPARE_SPECIES_TAB_IDS,
-	CORE_DATASET_TAB_ID,
-	type CompareSpeciesTabParams
-} from '@/app/components/pages/compare-species/compare-species-tab-params';
 import { parseSelectedSpeciesParam } from '@/app/lib/compare-species';
-import {
-	prefetchActiveTabData,
-	readTabIdSearchParam,
-	resolveInitialTabId
-} from '@/app/lib/tab-query-param';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { CompareSpeciesPageContent } from './PageContent';
 
-/**
- * Repeated `?name=` params — one per preselected species (#115) — plus the
- * shared `?tabId=` dataset deep link (#1069).
- */
+/** Repeated `?name=` params — one per preselected species (#115). */
 export type CompareSpeciesSearchParams = {
 	name?: string | string[];
-	tabId?: string;
 };
 
 export type CompareSpeciesParams = {
 	selectedSpecies: string[];
-	/** Already resolved against the known tab ids — never a garbage `?tabId=`. */
-	activeTabId: string;
 };
 
 export type CompareSpeciesPageData = {
 	speciesStats: StatsCacheBySpeciesResult[];
-	initialTabData?: { tabId: string; data: unknown };
 };
 
 type PageProps = { searchParams?: Promise<CompareSpeciesSearchParams> };
 
 /**
- * What `prefetchActiveTabData` is pointed at. Both dataset tabs are prop-fed
- * and declare no `dataFetcher` at all (the page's single
- * `fetchSpeciesComparisonStats` call already returns every row either tab
- * renders), so this is id-only and the prefetch resolves to `undefined` every
- * time — which is the
- * point: the list is the page's *declaration* of what each tab's fetch story
- * is, and a future dataset tab that does want a server-side prefetch only has
- * to say so here rather than re-touching the wiring below.
- */
-const compareSpeciesTabPrefetchers: Pick<
-	TabConfig<unknown, CompareSpeciesTabParams>,
-	'id' | 'dataFetcher'
->[] = COMPARE_SPECIES_TAB_IDS.map((id) => ({ id }));
-
-/**
  * The page's data doesn't depend on the selection at all — the selection is a
  * client-side filter over the one by-species dataset (see
- * `fetchSpeciesComparisonStats`) — so `params` is only read for the already
- * resolved `activeTabId`.
+ * `fetchSpeciesComparisonStats`) — so `params` isn't read here at all; the
+ * content component reads it directly off `data`/its own URL-seeded state.
  */
 export async function fetchCompareSpeciesPageContent(
 	params: CompareSpeciesParams,
 	viewedGroup: ViewedGroup
 ): Promise<CompareSpeciesPageData> {
-	const speciesStats = await fetchSpeciesComparisonStats(viewedGroup);
-	const initialTabData = await prefetchActiveTabData<
-		CompareSpeciesTabParams,
-		CompareSpeciesTabParams[]
-	>(
-		compareSpeciesTabPrefetchers,
-		params.activeTabId,
-		{ speciesStats, selectedSpecies: params.selectedSpecies },
-		viewedGroup
-	);
-	return { speciesStats, initialTabData };
+	return { speciesStats: await fetchSpeciesComparisonStats(viewedGroup) };
 }
 
 export default async function CompareSpeciesPage(
@@ -86,11 +43,6 @@ export default async function CompareSpeciesPage(
 			getParams={async (pageProps: PageProps) => ({
 				selectedSpecies: parseSelectedSpeciesParam(
 					(await pageProps.searchParams)?.name
-				),
-				activeTabId: resolveInitialTabId(
-					await readTabIdSearchParam(pageProps.searchParams),
-					COMPARE_SPECIES_TAB_IDS,
-					CORE_DATASET_TAB_ID
 				)
 			})}
 			getCacheKeys={() => ['compare-species']}
