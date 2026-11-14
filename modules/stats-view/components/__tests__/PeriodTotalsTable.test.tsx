@@ -453,12 +453,12 @@ describe('PeriodTotalsTable', () => {
 				expect.arrayContaining([
 					'Max weight (g)',
 					'Avg weight (g)',
-					'Min weight (g)',
 					'Median weight (g)',
+					'Min weight (g)',
 					'Max wing (mm)',
 					'Avg wing (mm)',
-					'Min wing (mm)',
-					'Median wing (mm)'
+					'Median wing (mm)',
+					'Min wing (mm)'
 				])
 			);
 			expect(headers).not.toContain('New');
