@@ -10,8 +10,9 @@ import type { TableQueryDefinition } from '../types';
  * fixture into this query's own `tables/Encounters/arretrap.encounters.json`.
  * Deliberately narrower than the real page's own Encounters `.select()`,
  * which additionally carries `breeding_condition`, `moult_code` and
- * `sexing_method` (rendered by `SingleBirdTable`) — see `bird-detail.ts`'s own
- * comment for why that means the two aren't actually the same query.
+ * `sexing_method` (rendered by the bird page's own
+ * `app/components/pages/bird/EncountersTable.tsx`) — see `bird-detail.ts`'s
+ * own comment for why that means the two aren't actually the same query.
  */
 export const arretrapEncountersQuery: TableQueryDefinition = {
 	table: 'Encounters',

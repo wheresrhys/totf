@@ -5,7 +5,7 @@ import {
 	deriveMeasurementRange,
 	type MeasurementRange
 } from '@/app/lib/measurement-range';
-import { SingleBirdTable } from '@/app/components/SingleBirdTable';
+import { InlineEncountersTable } from '@/app/components/InlineEncountersTable';
 import { MeasurementRangeCell } from '@/app/components/pages/species/MeasurementRangeCell';
 import {
 	AccordionTableBody,
@@ -89,7 +89,7 @@ function BirdDetailsTable({
 }: {
 	model: RowModelWithRawData<EnrichedBirdOfSpecies, RowModel>;
 }) {
-	return <SingleBirdTable encounters={encounters} isInline={true} />;
+	return <InlineEncountersTable encounters={encounters} />;
 }
 
 const cellFormatter = getFormattedValue<RowModel>(columnConfigs);

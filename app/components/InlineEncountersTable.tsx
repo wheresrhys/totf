@@ -3,9 +3,7 @@ import { format as formatDate } from 'date-fns';
 import type { EncounterOfBird } from '@/app/models/bird';
 import {
 	InlineTable,
-	SortableTable,
 	type ColumnConfig,
-	type RowModelWithRawData,
 	getFormattedValue
 } from '@/modules/ui-kit';
 
@@ -75,74 +73,40 @@ const orderedColumnProperties = Object.keys(
 	columnConfigs
 ) as (keyof RowModel)[];
 
-function SingleBirdTableBody({
-	data
-}: {
-	data: RowModelWithRawData<EncounterOfBird, RowModel>[];
-}) {
-	return (
-		<tbody>
-			{data.map((rowModel) => (
-				<tr key={rowModel._rawRowData.id}>
-					{orderedColumnProperties.map((property) => (
-						<td key={property}>
-							{cellFormatter(rowModel[property], property)}
-						</td>
-					))}
-				</tr>
-			))}
-		</tbody>
-	);
-}
-
-export function SingleBirdTable({
+export function InlineEncountersTable({
 	encounters,
-	isInline = false,
 	highlightRow
 }: {
 	encounters: EncounterOfBird[];
-	isInline?: boolean;
 	highlightRow?: (encounter: EncounterOfBird) => boolean;
 }) {
-	if (isInline) {
-		return (
-			<InlineTable testId="single-bird-table">
-				<thead>
-					<tr>
-						{orderedColumnProperties.map((property) => (
-							<th key={property}>{columnConfigs[property].label}</th>
-						))}
-					</tr>
-				</thead>
-				<tbody>
-					{encounters.map((encounter) => {
-						const rowModel = rowDataTransform(encounter);
-						const isHighlighted = highlightRow?.(encounter) ?? false;
-						return (
-							<tr
-								key={encounter.id}
-								className={isHighlighted ? 'bg-warning/20' : undefined}
-							>
-								{orderedColumnProperties.map((property) => (
-									<td key={property}>
-										{cellFormatter(rowModel[property], property)}
-									</td>
-								))}
-							</tr>
-						);
-					})}
-				</tbody>
-			</InlineTable>
-		);
-	} else {
-		return (
-			<SortableTable<EncounterOfBird, RowModel>
-				columnConfigs={columnConfigs}
-				data={encounters}
-				testId="single-bird-table"
-				rowDataTransform={rowDataTransform}
-				TableBodyComponent={SingleBirdTableBody}
-			/>
-		);
-	}
+	return (
+		<InlineTable testId="single-bird-table">
+			<thead>
+				<tr>
+					{orderedColumnProperties.map((property) => (
+						<th key={property}>{columnConfigs[property].label}</th>
+					))}
+				</tr>
+			</thead>
+			<tbody>
+				{encounters.map((encounter) => {
+					const rowModel = rowDataTransform(encounter);
+					const isHighlighted = highlightRow?.(encounter) ?? false;
+					return (
+						<tr
+							key={encounter.id}
+							className={isHighlighted ? 'bg-warning/20' : undefined}
+						>
+							{orderedColumnProperties.map((property) => (
+								<td key={property}>
+									{cellFormatter(rowModel[property], property)}
+								</td>
+							))}
+						</tr>
+					);
+				})}
+			</tbody>
+		</InlineTable>
+	);
 }

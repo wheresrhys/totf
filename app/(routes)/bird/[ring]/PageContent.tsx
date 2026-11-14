@@ -1,4 +1,4 @@
-import { SingleBirdTable } from '@/app/components/SingleBirdTable';
+import { EncountersTable } from '@/app/components/pages/bird/EncountersTable';
 import { format as formatDate } from 'date-fns';
 import {
 	BadgeList,
@@ -58,7 +58,7 @@ export function BirdPageContent({
 					<div className="m-2">
 						<EncountersTimeline encounters={enrichedBird.encounters} />
 					</div>
-					<SingleBirdTable encounters={enrichedBird.encounters} />
+					<EncountersTable encounters={enrichedBird.encounters} />
 				</>
 			) : (
 				<p>Not authorised to access any encounters for this bird</p>

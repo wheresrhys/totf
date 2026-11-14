@@ -11,8 +11,9 @@ import type { TableQueryDefinition } from '../types';
  * Encounters portion is a separate query definition rather than the same one
  * this Birds-row query reuses: the real page's Encounters `.select()` carries
  * three columns (`breeding_condition`, `moult_code`, `sexing_method`, rendered
- * by `SingleBirdTable`) that `supabase/scripts/generate-snapshots.ts`'s narrower
- * fixture query deliberately omits, so the two aren't actually the same query.
+ * by the bird page's own `app/components/pages/bird/EncountersTable.tsx`)
+ * that `supabase/scripts/generate-snapshots.ts`'s narrower fixture query
+ * deliberately omits, so the two aren't actually the same query.
  */
 export const birdDetailQuery: TableQueryDefinition = {
 	table: 'Birds',
