@@ -22,12 +22,12 @@ const AGE_BUCKET_HEADINGS = [
 const BIOMETRIC_HEADINGS = [
 	'Max weight (g)',
 	'Avg weight (g)',
-	'Min weight (g)',
 	'Median weight (g)',
+	'Min weight (g)',
 	'Max wing (mm)',
 	'Avg wing (mm)',
-	'Min wing (mm)',
-	'Median wing (mm)'
+	'Median wing (mm)',
+	'Min wing (mm)'
 ];
 
 function makeEncounter(

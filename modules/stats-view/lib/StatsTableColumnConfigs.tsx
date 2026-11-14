@@ -3,7 +3,7 @@ import {
 	type ColumnConfig,
 	type RowModelWithRawData
 } from '@/modules/ui-kit';
-import { BiometricStatNames, type BiometricStatName } from '@/modules/stats/browser';
+import type { BiometricStatName } from '@/modules/stats/browser';
 
 // A thicker border marks where the "age class" block of columns
 // (Pulli/Juv/Postjuv/Adult/Unaged) starts and ends, visually separating it
@@ -25,8 +25,21 @@ export function columnBlock(
 	extraClassName?: string
 ): Pick<ColumnConfig, 'headerClassName' | 'cellClassName'> {
 	const className =
-		`bg-${baseColor}-50 dark:bg-${baseColor}-950 ${extraClassName ?? ''}`.trim();
+		`${tintClassName(baseColor, 50, 950)} ${extraClassName ?? ''}`.trim();
 	return { headerClassName: className, cellClassName: className };
+}
+
+// The one place a `bg-<color>-<shade>` pair is composed from parts, shared by
+// `columnBlock` above and `biometricColumnBlock` below. Every
+// `(baseColor, lightShade, darkShade)` triple either of them can produce has
+// to appear in `app/globals.css`'s `@source inline(...)` safelist — see
+// `columnBlock`'s comment for why.
+function tintClassName(
+	baseColor: string,
+	lightShade: number,
+	darkShade: number
+): string {
+	return `bg-${baseColor}-${lightShade} dark:bg-${baseColor}-${darkShade}`;
 }
 
 // Factory for a first-column cell that renders a row's name as a link. Both the
@@ -158,7 +171,7 @@ export function buildStandardColumnConfigs<RowModel>(
 export type TotalsRowCellsInput<RowModel> = {
 	columnConfigs: Partial<Record<keyof RowModel, ColumnConfig>>;
 	// Optional per-column overrides rendered verbatim in place of the summed/
-	// passed-through value — e.g. a `'-'` placeholder for the Individuals column
+	// passed-through value — e.g. a `'-'` placeholder for the Birds column
 	// on an encounters-only tab, where a bird count is meaningless.
 	cellOverrides?: Partial<Record<keyof RowModel, React.ReactNode>>;
 } & ({ totalsRowModel: RowModel } | { rowModels: RowModel[] });
@@ -222,43 +235,84 @@ function formatBiometricValue(value: unknown): string {
 		: MISSING_BIOMETRIC_VALUE;
 }
 
-// `max`/`avg`/`min`/`median` phrasing, keyed off the first segment of each
+// Column order within each measurement: the two extremes bracket the two
+// central measures, so Median reads next to Avg rather than after Min. This
+// array's order *is* the rendered column order — every table body iterates
+// `Object.keys(columnConfigs)`, so the order the config object's keys are
+// inserted in below is what the user sees.
+const BIOMETRIC_STAT_PREFIX_ORDER = ['max', 'avg', 'median', 'min'] as const;
+
+type BiometricStatPrefix = (typeof BIOMETRIC_STAT_PREFIX_ORDER)[number];
+
+// `max`/`avg`/`median`/`min` phrasing for the first segment of each
 // `BiometricStatName` (e.g. `max_weight` -> `max`).
-const BIOMETRIC_STAT_PREFIX_LABELS: Record<string, string> = {
+const BIOMETRIC_STAT_PREFIX_LABELS: Record<BiometricStatPrefix, string> = {
 	max: 'Max',
 	avg: 'Avg',
-	min: 'Min',
-	median: 'Median'
+	median: 'Median',
+	min: 'Min'
 };
 
-// Unit suffix for each measurement, keyed off the second segment of each
-// `BiometricStatName` (e.g. `max_weight` -> `weight`).
-const BIOMETRIC_MEASUREMENT_UNITS: Record<string, string> = {
-	weight: 'g',
-	wing: 'mm'
+// Each measurement's column group, in rendered order: its unit suffix for the
+// header, and the base colour its four columns are tinted with — weight
+// purple, wing green, so the two groups read as distinct blocks the way the
+// age buckets do.
+const BIOMETRIC_MEASUREMENTS = [
+	{ name: 'weight', unit: 'g', baseColor: 'purple' },
+	{ name: 'wing', unit: 'mm', baseColor: 'green' }
+] as const;
+
+// Per-stat shade ramp for a measurement's base colour, graduating prominence
+// with how extreme the stat is: Max carries the most saturated tint and Min
+// the faintest in light mode / deepest in dark mode, mirroring `columnBlock`'s
+// light-tint/dark-shade convention at four levels instead of one. Only real
+// Tailwind palette steps (there is no `-150`/`-250`), stopping at `300`/`700`
+// so `base-content` text stays legible on every step in both modes. Every
+// shade here must be in `app/globals.css`'s `@source inline(...)` safelist.
+const BIOMETRIC_STAT_SHADES: Record<
+	BiometricStatPrefix,
+	{ light: number; dark: number }
+> = {
+	max: { light: 300, dark: 700 },
+	avg: { light: 200, dark: 800 },
+	median: { light: 100, dark: 900 },
+	min: { light: 50, dark: 950 }
 };
+
+// The graduated counterpart to `columnBlock` — same header-and-cells tinting,
+// but picking its shade pair per stat level from `BIOMETRIC_STAT_SHADES`.
+function biometricColumnBlock(
+	baseColor: string,
+	statPrefix: BiometricStatPrefix
+): Pick<ColumnConfig, 'headerClassName' | 'cellClassName'> {
+	const { light, dark } = BIOMETRIC_STAT_SHADES[statPrefix];
+	const className = tintClassName(baseColor, light, dark);
+	return { headerClassName: className, cellClassName: className };
+}
 
 // Builds the 8 wing/weight biometric column configs (#1433) — the shared
 // foundation the Counts/Biometrics toggle switches a stats table's
 // per-species breakdown block onto, mirroring `buildStandardColumnConfigs`'s
-// shape for the existing age-bucket block. Reduces over the canonical
-// `BiometricStatNames` array (`@/modules/stats/browser`) rather than a
-// hand-typed key list, so the config's key set can never drift from it.
+// shape for the existing age-bucket block. Keys are composed from the two
+// arrays above (measurement outer, stat level inner) rather than read off
+// `BiometricStatNames`' own order, since that array is a canonical field list
+// with no say in presentation; its 8 names are still exactly what the
+// composition can produce, which `tsc` checks and the key-set test guards.
 // Label/formatting copies `comparison-columns.ts`'s `biometricsComparisonColumns`/
 // `formatMeasurement` convention exactly, for consistency between the two
 // tables that now render the same 8 columns.
 export function buildBiometricColumnConfigs(): Partial<
 	Record<BiometricStatName, ColumnConfig>
 > {
-	return BiometricStatNames.reduce<Partial<Record<BiometricStatName, ColumnConfig>>>(
-		(configs, statName) => {
-			const [prefix, measurement] = statName.split('_');
-			configs[statName] = {
-				label: `${BIOMETRIC_STAT_PREFIX_LABELS[prefix]} ${measurement} (${BIOMETRIC_MEASUREMENT_UNITS[measurement]})`,
-				formatter: formatBiometricValue
+	const configs: Partial<Record<BiometricStatName, ColumnConfig>> = {};
+	BIOMETRIC_MEASUREMENTS.forEach(({ name, unit, baseColor }) => {
+		BIOMETRIC_STAT_PREFIX_ORDER.forEach((prefix) => {
+			configs[`${prefix}_${name}`] = {
+				label: `${BIOMETRIC_STAT_PREFIX_LABELS[prefix]} ${name} (${unit})`,
+				formatter: formatBiometricValue,
+				...biometricColumnBlock(baseColor, prefix)
 			};
-			return configs;
-		},
-		{}
-	);
+		});
+	});
+	return configs;
 }

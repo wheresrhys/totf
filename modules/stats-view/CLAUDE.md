@@ -113,7 +113,8 @@ modules/stats-view/
                                  # colour-blocking (columnBlock), the 8 wing/weight
                                  # columns the Counts/Biometrics toggle switches to
                                  # (#1433), and the totals row (moved from
-                                 # modules/ui-kit, #1353)
+                                 # modules/ui-kit, #1353). See "Biometric column
+                                 # order and tinting" below
     __tests__/          # one test per helper above except species-stats.ts (whose only
                         # export is a column-config list tsc already proves, #1418),
                         # plus helpers/two-option-toggle.tsx
@@ -123,7 +124,11 @@ modules/stats-view/
       PeriodTotalsTable.tsx         # one row per time period (year/month/day) —
                                      # the summary and species totals tabs' table
       SpeciesTotalsTable.tsx        # one row per species over a period — the
-                                     # summary pages' Species totals tab
+                                     # summary pages' Species totals tab. Species/
+                                     # Sessions/Encounters head it in either stats
+                                     # class; Busiest session and Birds sit in the
+                                     # counts branch with the age buckets, so
+                                     # biometrics mode hides them (#1430)
       SessionSpeciesTotalsTable.tsx # one row per species within one session, with
                                      # an expandable per-species encounters drill-down;
                                      # shared by the Mist-netting and Other catches tabs.
@@ -142,6 +147,31 @@ modules/stats-view/
                                      # none (#1327 added no new tests, and it's covered
                                      # indirectly through the pages that render it)
 ```
+
+## Biometric column order and tinting
+
+`buildBiometricColumnConfigs` (`lib/StatsTableColumnConfigs.tsx`) is shared by every table the
+Counts/Biometrics toggle reaches, so its column order and colours are decided once, there, and
+apply everywhere at the same time. Two things about it are easy to get wrong:
+
+- **It composes its 8 keys from a measurement list × a stat-level list, deliberately not from
+  `BiometricStatNames`' own array order.** Insertion order into the config object _is_ rendered
+  column order — every table body iterates `Object.keys(columnConfigs)` — and
+  `BiometricStatNames` (`@/modules/stats`) is a canonical field list with no say in presentation,
+  so reordering it to change the UI would be the wrong lever. The composition still can't produce
+  anything but that array's 8 names (`tsc` checks the template-literal key type, and
+  `buildBiometricColumnConfigs`' key-set test compares against the array), so the drift guard the
+  old `BiometricStatNames.reduce` gave is intact. Current order: weight group then wing group,
+  each ordered Max, Avg, Median, Min — the two extremes bracketing the two central measures
+  (#1430).
+- **The tint is graduated, not flat, and the whole ramp has to be safelisted.** `columnBlock`'s
+  one-shade-per-colour convention doesn't fit here, so `biometricColumnBlock` picks a shade pair
+  per stat level out of `BIOMETRIC_STAT_SHADES`: weight purple, wing green, most saturated at Max
+  (`-300` light / `-700` dark) down to faintest at Min (`-50` / `-950`). Both helpers route
+  through one `tintClassName`, and **every shade either can emit must appear in `app/globals.css`'s
+  `@source inline(...)` safelist** — a runtime-composed `bg-<color>-<shade>` is invisible to
+  Tailwind's file scanner, so a missing entry means the class silently does nothing in the built
+  CSS rather than failing anywhere a test could see.
 
 ## What it imports from outside the module
 

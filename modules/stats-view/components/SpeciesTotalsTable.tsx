@@ -109,10 +109,11 @@ function deriveRow(
 		: deriveSpeciesTotalsRowByEncounter;
 }
 
-// `statsClass` switches the block after Individuals between the
-// existing age-bucket columns and the 8 biometric columns (#1430) — the
-// Species/Sessions/Encounters/Busiest session/Individuals columns before it
-// are unaffected by either toggle.
+// Species/Sessions/Encounters head the table in either mode; everything after
+// them is what the Counts/Biometrics toggle switches (#1430). Busiest session
+// and Birds sit in the counts branch rather than ahead of the switch: both are
+// bird/session counts, so they have nothing to say alongside a wing/weight
+// breakdown and are hidden outright in biometrics mode.
 function buildColumnConfigs(
 	hasPulli: boolean,
 	aggregateBy: string,
@@ -129,15 +130,17 @@ function buildColumnConfigs(
 		encounterCount: {
 			label: 'Encounters'
 		},
-		maxPerSession: {
-			label: 'Busiest session'
-		},
-		individualsCount: {
-			label: 'Individuals'
-		},
 		...(statsClass === 'biometrics'
 			? buildBiometricColumnConfigs()
-			: buildStandardColumnConfigs<RowModel>(hasPulli, true, aggregateBy))
+			: {
+					maxPerSession: {
+						label: 'Busiest session'
+					},
+					individualsCount: {
+						label: 'Birds'
+					},
+					...buildStandardColumnConfigs<RowModel>(hasPulli, true, aggregateBy)
+				})
 	};
 }
 
@@ -157,7 +160,7 @@ export function SpeciesTotalsTable({
 	// different tab, per #604.
 	const [aggregateBy, setAggregateBy] = useState<AggregateByValue>('bird');
 	// Independent of `aggregateBy` — the Counts/Biometrics toggle (#1430)
-	// switches the post-Individuals column block, defaulting to counts (the
+	// switches the post-Encounters column block, defaulting to counts (the
 	// existing behaviour everywhere today).
 	const [statsClass, setStatsClass] = useState<StatsClass>('counts');
 
