@@ -191,15 +191,18 @@ apply everywhere at the same time. Two things about it are easy to get wrong:
   `@deprecated` stats aliases onto the canonical `modules/stats` names above, and #1419 swept the
   four test files that still named them as it deleted the aliases outright.
 - **A handful of `app/` leaves** — `@/app/lib/group-slug` (`ViewedGroup`),
-  `@/app/lib/measurement-range`, `@/app/components/SingleBirdTable`,
+  `@/app/lib/measurement-range`, `@/app/components/InlineEncountersTable`,
   `@/app/components/pages/species/MeasurementRangeCell` and
   `@/app/components/pages/session/EncountersTable`. There were two more until #1434 deleted
   `SppStatsTable`, which owned both: `@/app/actions/spp-data` (its own refetch on filter change)
   and the type-only `@/app/(routes)/species/page` (`PageData`) — so **no file here imports an
   `app/` route or action any more**, only leaf components and helpers. The three components among
-  those stayed put on purpose: `SingleBirdTable` is independently reused by the mistakes and bird pages, and
-  `MeasurementRangeCell`/`EncountersTable` are page-family-specific rather than stats-table
-  primitives.
+  those stayed put on purpose: `InlineEncountersTable` (renamed from `SingleBirdTable`, #1442 —
+  it dropped the `isInline` prop and the `SortableTable` branch it used to switch on, since every
+  remaining caller always passed `isInline={true}`; the bird page's own richer, sortable table is
+  now the separate `app/components/pages/bird/EncountersTable.tsx`) is independently reused by
+  the mistakes and bird pages, and `MeasurementRangeCell`/`EncountersTable` are page-family-specific
+  rather than stats-table primitives.
 
 **One of those edges used to close a cycle through the barrel; it is fully gone now.**
 `app/actions/spp-data.ts` imported `mergeSpeciesBiometrics` from `@/modules/stats-view` while the

@@ -77,7 +77,7 @@ describe('bird detail page', () => {
 		render(
 			await Page({ params: Promise.resolve({ ring: birdFixture.ring_no }) })
 		);
-		const table = await screen.findByTestId('single-bird-table');
+		const table = await screen.findByTestId('bird-encounters-table');
 		const rows = table.querySelectorAll('tbody tr');
 		expect(rows.length).toBe(encountersData.length);
 	});

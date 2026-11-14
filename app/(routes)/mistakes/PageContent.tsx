@@ -11,7 +11,7 @@ import {
 	type ColumnConfig,
 	type RowModelWithRawData
 } from '@/modules/ui-kit';
-import { SingleBirdTable } from '@/app/components/SingleBirdTable';
+import { InlineEncountersTable } from '@/app/components/InlineEncountersTable';
 import { fetchBirdEncounters } from '@/app/actions/bird-encounters';
 import type { EncounterOfBird } from '@/app/models/bird';
 import type { DiscrepenciesResult } from '@/app/models/db';
@@ -110,9 +110,8 @@ function LazyBirdDetail({
 	}
 
 	return (
-		<SingleBirdTable
+		<InlineEncountersTable
 			encounters={encounters}
-			isInline={true}
 			highlightRow={makeHighlighter(discrepency_type, encounters)}
 		/>
 	);
