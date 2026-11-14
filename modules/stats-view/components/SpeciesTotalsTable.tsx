@@ -10,7 +10,7 @@ import {
 	type BiometricStatName,
 	type StatsCacheBySpeciesResult
 } from '@/modules/stats/browser';
-import type { SpeciesTotalsRow } from '../types';
+import type { SpeciesTotalsRow, StatsClass } from '../types';
 import {
 	buildBiometricColumnConfigs,
 	buildStandardColumnConfigs,
@@ -109,14 +109,14 @@ function deriveRow(
 		: deriveSpeciesTotalsRowByEncounter;
 }
 
-// `showBiometrics` switches the block after Individuals between the
+// `statsClass` switches the block after Individuals between the
 // existing age-bucket columns and the 8 biometric columns (#1430) — the
 // Species/Sessions/Encounters/Busiest session/Individuals columns before it
 // are unaffected by either toggle.
 function buildColumnConfigs(
 	hasPulli: boolean,
 	aggregateBy: string,
-	showBiometrics: boolean
+	statsClass: StatsClass
 ): Partial<Record<keyof RowModel, ColumnConfig>> {
 	return {
 		speciesName: {
@@ -135,7 +135,7 @@ function buildColumnConfigs(
 		individualsCount: {
 			label: 'Individuals'
 		},
-		...(showBiometrics
+		...(statsClass === 'biometrics'
 			? buildBiometricColumnConfigs()
 			: buildStandardColumnConfigs<RowModel>(hasPulli, true, aggregateBy))
 	};
@@ -159,7 +159,7 @@ export function SpeciesTotalsTable({
 	// Independent of `aggregateBy` — the Counts/Biometrics toggle (#1430)
 	// switches the post-Individuals column block, defaulting to counts (the
 	// existing behaviour everywhere today).
-	const [showBiometrics, setShowBiometrics] = useState(false);
+	const [statsClass, setStatsClass] = useState<StatsClass>('counts');
 
 	if (speciesStats.length === 0) {
 		return <p>No species recorded.</p>;
@@ -212,11 +212,7 @@ export function SpeciesTotalsTable({
 	const hasPulli = speciesStats.some(
 		(stat) => activeDeriveRow(stat).pullusCount > 0
 	);
-	const columnConfigs = buildColumnConfigs(
-		hasPulli,
-		aggregateBy,
-		showBiometrics
-	);
+	const columnConfigs = buildColumnConfigs(hasPulli, aggregateBy, statsClass);
 
 	const totalsRow = totalsStats
 		? buildTotalsRowCells<RowModel>({
@@ -236,12 +232,9 @@ export function SpeciesTotalsTable({
 				<AggregateByToggle
 					value={aggregateBy}
 					onChange={setAggregateBy}
-					disabled={showBiometrics}
+					disabled={statsClass === 'biometrics'}
 				/>
-				<CountsBiometricsToggle
-					value={showBiometrics}
-					onChange={setShowBiometrics}
-				/>
+				<CountsBiometricsToggle value={statsClass} onChange={setStatsClass} />
 			</div>
 			<SortableTable<StatsCacheBySpeciesResult, RowModel>
 				columnConfigs={columnConfigs}
