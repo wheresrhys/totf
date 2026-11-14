@@ -31,7 +31,10 @@ export type SessionSpeciesBiometrics = Record<BiometricStatName, number | null>;
 // `StatsTableColumnConfigs`'s `StandardField` union rather than following
 // `SpeciesTotalsRow`'s `*Count`-suffixed convention, so `PeriodTotalsRow` can
 // be used directly as `PeriodTotalsTable`'s `SortableTable` row model without
-// a remapping step — see `buildStandardColumnConfigs`.
+// a remapping step — see `buildStandardColumnConfigs`. The 8 `BiometricStatName`
+// fields (#1432) are intersected on rather than renamed, so they line up
+// directly with `buildBiometricColumnConfigs`'s own `BiometricStatName` keys
+// with no remapping step either — same reasoning, same shape.
 export type PeriodTotalsRow = {
 	timePeriod: string;
 	sessionsCount: number;
@@ -46,7 +49,7 @@ export type PeriodTotalsRow = {
 	postjuv: number;
 	adults: number;
 	unknownAge: number;
-};
+} & Record<BiometricStatName, number | null>;
 
 // The 8 `BiometricStatName` fields are intersected on rather than listed by
 // hand, so they can never drift from the canonical field list — same

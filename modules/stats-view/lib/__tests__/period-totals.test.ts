@@ -25,6 +25,20 @@ const fullRowOverrides: Partial<StatsCacheResult> = {
 	unknown_age_bird_count: 1
 };
 
+// The 8 wing/weight fields at `buildCoreStatsRow`'s own defaults (#1432) —
+// shared by every exact-match `toEqual` below, since neither deriver's test
+// overrides them.
+const defaultBiometricFields = {
+	max_weight: 13.1,
+	avg_weight: 11.2,
+	min_weight: 9.8,
+	median_weight: 10.8,
+	max_wing: 68,
+	avg_wing: 66.6,
+	min_wing: 65,
+	median_wing: 67
+};
+
 describe('derivePeriodTotalsRowByBird', () => {
 	it('maps every StatsCacheResult bucket field to its PeriodTotalsRow counterpart', () => {
 		const stat = buildCoreStatsRow(fullRowOverrides);
@@ -41,7 +55,31 @@ describe('derivePeriodTotalsRowByBird', () => {
 			juvs: 2,
 			postjuv: 1,
 			adults: 1,
-			unknownAge: 1
+			unknownAge: 1,
+			...defaultBiometricFields
+		});
+	});
+
+	it('carries the 8 biometric fields through from the StatsResult row', () => {
+		const stat = buildCoreStatsRow({
+			max_weight: 20.1,
+			avg_weight: 18.2,
+			min_weight: 16.3,
+			median_weight: 17.4,
+			max_wing: 90,
+			avg_wing: 88,
+			min_wing: 86,
+			median_wing: 87
+		});
+		expect(derivePeriodTotalsRowByBird(stat)).toMatchObject({
+			max_weight: 20.1,
+			avg_weight: 18.2,
+			min_weight: 16.3,
+			median_weight: 17.4,
+			max_wing: 90,
+			avg_wing: 88,
+			min_wing: 86,
+			median_wing: 87
 		});
 	});
 
@@ -85,7 +123,11 @@ describe('derivePeriodTotalsRowByBird', () => {
 			juvs: 0,
 			postjuv: 0,
 			adults: 0,
-			unknownAge: 0
+			unknownAge: 0,
+			// Biometrics aren't zeroed out by a zero-activity count row — a
+			// real zero-session period still carries the cache's own
+			// (unrelated) wing/weight columns, same as any other row.
+			...defaultBiometricFields
 		});
 	});
 });
@@ -106,13 +148,55 @@ describe('derivePeriodTotalsRowByEncounter', () => {
 			juvs: 3,
 			postjuv: 1,
 			adults: 1,
-			unknownAge: 0
+			unknownAge: 0,
+			...defaultBiometricFields
 		});
 	});
 
 	it('maps max_per_session to maxPerSession', () => {
 		const stat = buildCoreStatsRow({ max_per_session: 9 });
 		expect(derivePeriodTotalsRowByEncounter(stat).maxPerSession).toBe(9);
+	});
+
+	it('carries the 8 biometric fields through from the StatsResult row', () => {
+		const stat = buildCoreStatsRow({
+			max_weight: 20.1,
+			avg_weight: 18.2,
+			min_weight: 16.3,
+			median_weight: 17.4,
+			max_wing: 90,
+			avg_wing: 88,
+			min_wing: 86,
+			median_wing: 87
+		});
+		expect(derivePeriodTotalsRowByEncounter(stat)).toMatchObject({
+			max_weight: 20.1,
+			avg_weight: 18.2,
+			min_weight: 16.3,
+			median_weight: 17.4,
+			max_wing: 90,
+			avg_wing: 88,
+			min_wing: 86,
+			median_wing: 87
+		});
+	});
+
+	it('carries the same biometric values as derivePeriodTotalsRowByBird (no bird/encounter distinction for biometrics)', () => {
+		const stat = buildCoreStatsRow();
+		const byBirdRow = derivePeriodTotalsRowByBird(stat);
+		const byEncounterRow = derivePeriodTotalsRowByEncounter(stat);
+		for (const statName of [
+			'max_weight',
+			'avg_weight',
+			'min_weight',
+			'median_weight',
+			'max_wing',
+			'avg_wing',
+			'min_wing',
+			'median_wing'
+		] as const) {
+			expect(byEncounterRow[statName]).toBe(byBirdRow[statName]);
+		}
 	});
 });
 

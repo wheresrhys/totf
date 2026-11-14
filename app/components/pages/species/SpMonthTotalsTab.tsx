@@ -53,6 +53,7 @@ export function SpMonthTotalsTab({
 			rows={visibleRows.map((row) => row.stats)}
 			firstColumnHeader="Month"
 			showSpeciesColumn={false}
+			showBiometricsToggle
 			buildHref={(timePeriod) =>
 				`/species/${params.speciesName}/${year}/${Number(timePeriod.slice(5, 7))}`
 			}
