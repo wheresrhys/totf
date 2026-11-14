@@ -170,8 +170,8 @@ zones and don't belong to any single scoped doc:
   catalogued here purely because it's a module per the "Module conventions" below, not because
   it's used outside `app/` — nothing else consumes it. See its own
   [`modules/ui-kit/CLAUDE.md`](modules/ui-kit/CLAUDE.md).
-- `modules/stats-view/` — the 5 stats-table components (`PeriodTotalsTable`,
-  `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SppStatsTable`, `SpTable`) every
+- `modules/stats-view/` — the 4 stats-table components (`PeriodTotalsTable`,
+  `SpeciesTotalsTable`, `SessionSpeciesTotalsTable`, `SpTable`) every
   summary/species/session tab renders, plus the 4 pure helpers that reshape a
   `stats_cache_*_metrics`/`SimpleStatsCache` row into the row model each one wants, 
   extracted from `app/components/*` and `app/lib/*`

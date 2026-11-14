@@ -378,21 +378,26 @@ type BasicSessionMetricsRpcRow = Pick<
  *   would read as a bird that weighed nothing. Recovering a real value means a
  *   `stats_cache_biometrics_metrics` call for the same window — exactly what
  *   `app/actions/spp-data.ts`'s arbitrary-window fallback already does for the
- *   biometrics half of the `/species` list page, merged onto these rows by
+ *   biometrics half of a by-species read, merged onto these rows by
  *   `species_id` (#1415). It is deliberately not done *here*: this function
  *   serves every `fetchAuthorisedCoreStats` caller, most of which never render
  *   a wing/weight column, and issuing the extra RPC for all of them would make
- *   every arbitrary-window read pay for one page's columns.
+ *   every arbitrary-window read pay for one table's columns.
  *
- * **Nothing on this call path reads any of the 22 today.** The `/species` list
- * page's rendered column set (`speciesStatConfigs`,
- * `modules/stats-view/lib/species-stats.ts`) is only
- * `species_name`/`bird_count`/`encounter_count`/`session_count`/
- * `max_per_session` plus the separately-sourced biometric columns, and
- * `hasVisibleData` below reads only `encounter_count` — a column the RPC
- * genuinely produces, so its zero-check is unaffected by any of this. Don't
- * start reading a real value out of one of these columns on this path without
- * making the corresponding call above first.
+ * **Nothing rendered today is served by this path.** Every window the summary
+ * pages ask for — all time, a whole calendar year, a whole calendar month, a
+ * squashed calendar month — *is* a cache cell and so reads whole cache rows,
+ * placeholders never involved; `hasVisibleData` below reads only
+ * `encounter_count`, a column the RPC genuinely produces, so its zero-check is
+ * unaffected by any of this. What's gone (#1434) is the one UI that could ask
+ * for an arbitrary window at all: the `/species` list page's two free-text date
+ * inputs. Note the margin that page used to give is gone with it — it rendered
+ * only `species_name`/`bird_count`/`encounter_count`/`session_count`/
+ * `max_per_session` plus its separately-sourced biometric columns, whereas the
+ * summary page's Species tab (`modules/stats-view`'s `SpeciesTotalsTable`, via
+ * `deriveSpeciesTotalsRow`) *does* render the 10 age buckets. So if a caller is
+ * ever given an arbitrary window again, placeholder zeroes would reach a
+ * rendered column — make the corresponding RPC call above first.
  *
  * The `satisfies` target is derived rather than a hand-listed column union, so
  * this const cannot silently fall behind the cache tables: a column added to

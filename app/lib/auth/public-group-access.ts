@@ -12,15 +12,15 @@ import {
 // Each pattern must capture the group slug as its first group.
 const PUBLIC_PATH_PATTERNS = [
 	// `/group/<slug>/summary`, `/group/<slug>/summary/<year>`, or
-	// `/group/<slug>/summary/<year>/<month>` (#770).
-	/^\/group\/([^/]+)\/summary(\/|$)/,
-	// The `/species` LIST page only (#1231) — deliberately anchored, so the
-	// `/species/<name>` detail pages stay behind the login gate. Its stats
-	// come from the same `SimpleStatsCache*` tables the summary subtree reads
-	// (via `fetchAuthorisedCoreStats`' `'public'` branch), so no new data gate
-	// is needed to serve it; the detail pages read beyond those tables and are
-	// out of scope.
-	/^\/group\/([^/]+)\/species\/?$/
+	// `/group/<slug>/summary/<year>/<month>` (#770). This also covers the
+	// per-species counts/biometrics table an anonymous visitor used to reach
+	// at `/group/<slug>/species`: that standalone list page was replaced by the
+	// summary page's own Species tab (`?tabId=species-totals`) and deleted
+	// (#1434), so its pattern — anchored to the list path only, never the
+	// `/species/<name>` detail pages (#1231) — went with it. The detail pages
+	// read beyond the `SimpleStatsCache*` tables and stay behind the login
+	// gate, exactly as before.
+	/^\/group\/([^/]+)\/summary(\/|$)/
 ];
 
 // Resolves an anonymous (no-cookie) request's pathname to the id of the

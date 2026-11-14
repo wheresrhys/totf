@@ -155,8 +155,13 @@ test.describe.serial('import flow', { tag: ['@delta', '@mutates'] }, () => {
 		])
 	})
 
-	test('imported species appear on /species page', async ({ page }) => {
-		await page.goto('/species')
+	// The standalone /species list page this used to assert against was deleted
+	// in favour of the summary page's Species tab (#1434) — same read, same
+	// rows, one URL further in.
+	test('imported species appear on the summary species tab', async ({
+		page
+	}) => {
+		await page.goto('/summary?tabId=species-totals')
 		await expect(page.getByRole('link', { name: 'Wren' })).toBeVisible()
 		await expect(page.getByRole('link', { name: 'Dunnock' })).toBeVisible()
 	})

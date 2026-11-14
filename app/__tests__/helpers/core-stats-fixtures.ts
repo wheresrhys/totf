@@ -246,8 +246,8 @@ function resolveAllSpeciesRow(row: Record<string, unknown>): StatsCacheResult {
 
 /**
  * Alpha/Beta/Gamma's whole by-species result, one row per species — powers
- * `fetchSpeciesData`'s cache-aligned windows (the `/species` list page's
- * default and year-select views).
+ * `fetchSpeciesData`'s cache-aligned windows (every window the summary pages'
+ * Species tab asks for).
  */
 export const ALPHA_CORE_STATS_BY_SPECIES: StatsCacheBySpeciesResult[] =
 	alphaBySpeciesSnapshot.map(resolveBySpeciesRow);
@@ -289,7 +289,7 @@ export const ALPHA_HOME_PAGE_SUMMARY_STATS: {
  * encounter at the all-time grain, already carrying its own biometric
  * columns (unlike `biometrics-stats-fixtures.ts`'s
  * `ROBIN_ALPHA_BIOMETRICS_HEADLINE`, which exists for the one call site that
- * still fetches the two halves separately — see `species-stats.ts`). Powers
+ * still fetches the two halves separately). Powers
  * the species detail page's headline stats (#1222).
  */
 export const ROBIN_ALPHA_HEADLINE: StatsCacheBySpeciesResult =
