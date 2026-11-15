@@ -157,21 +157,21 @@ describe('TemporalFilterControls', () => {
 	});
 
 	describe('computing the effective date range', () => {
-		it('uses the year-derived range when only year is selected', () => {
+		it('names the year when only year is selected', () => {
 			renderControls();
 
 			selectYear(2022);
 
-			expect(getEffectiveDateRange()).toBe('Showing: 2022-01-01 to 2022-12-31');
+			expect(getEffectiveDateRange()).toBe('Showing: 2022');
 		});
 
-		it('uses the year-and-month-derived range when both year and month are selected', () => {
+		it('names the month and year when both are selected', () => {
 			renderControls();
 
 			selectYear(2022);
 			selectMonth(2);
 
-			expect(getEffectiveDateRange()).toBe('Showing: 2022-02-01 to 2022-02-28');
+			expect(getEffectiveDateRange()).toBe('Showing: February 2022');
 		});
 
 		it('uses the explicit fromDate/toDate when only those are set', () => {
@@ -290,7 +290,7 @@ describe('TemporalFilterControls', () => {
 			selectYear(2022);
 
 			expect(queryFilterError()).toBeNull();
-			expect(getEffectiveDateRange()).toBe('Showing: 2022-05-01 to 2022-05-31');
+			expect(getEffectiveDateRange()).toBe('Showing: May 2022');
 			expect(lastPushedHref()).toBe('/species?year=2022&month=5');
 		});
 
@@ -300,7 +300,7 @@ describe('TemporalFilterControls', () => {
 			selectYear(2022);
 
 			expect(queryFilterError()).toBeNull();
-			expect(getEffectiveDateRange()).toBe('Showing: 2022-01-01 to 2022-12-31');
+			expect(getEffectiveDateRange()).toBe('Showing: 2022');
 		});
 
 		it('renders the error for an initial selection seeded from the URL', () => {

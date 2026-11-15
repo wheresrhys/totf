@@ -28,8 +28,8 @@ describe('group_ticks', () => {
 
 	// Alpha species first-encounter dates (across all locations, all record types):
 	//   Redwing 2023-03-20, Fieldfare 2023-03-15 (both added by #902),
-	//   Reed Warbler 2022-06-15, Blue Tit 2022-04-30, Kingfisher 2022-04-30,
-	//   Robin 2021-06-20, Wren 2021-06-20
+	//   Reed Warbler 2022-06-15, Kingfisher 2022-04-30 06:50, Blue Tit 2022-04-30 06:35,
+	//   Wren 2021-06-20 06:55, Robin 2021-06-20 06:00
 	// group_ticks doesn't use stats_raw_encounters, so it's unaffected by #874's
 	// resighting exclusion — Kingfisher/Wren's dates here are their real captures,
 	// unrelated to the resighting-only rows #902 also added for those species.
@@ -43,7 +43,7 @@ describe('group_ticks', () => {
 		);
 	});
 
-	it('a group with multiple species returns them ordered by most recent first_encounter_date first', async () => {
+	it('a group with multiple species returns them ordered by most recent first encounter first', async () => {
 		const { data, error } = await alphaClient.rpc('group_ticks', {
 			ringing_group_filter: alphaId
 		});
@@ -65,22 +65,22 @@ describe('group_ticks', () => {
 				is_first_ever: true
 			},
 			{
-				species_name: 'Blue Tit',
-				first_encounter_date: '2022-04-30',
-				is_first_ever: true
-			},
-			{
 				species_name: 'Kingfisher',
 				first_encounter_date: '2022-04-30',
 				is_first_ever: true
 			},
 			{
-				species_name: 'Robin',
-				first_encounter_date: '2021-06-20',
+				species_name: 'Blue Tit',
+				first_encounter_date: '2022-04-30',
 				is_first_ever: true
 			},
 			{
 				species_name: 'Wren',
+				first_encounter_date: '2021-06-20',
+				is_first_ever: true
+			},
+			{
+				species_name: 'Robin',
 				first_encounter_date: '2021-06-20',
 				is_first_ever: true
 			}
@@ -95,12 +95,12 @@ describe('group_ticks', () => {
 			expect(error).toBeNull();
 			expect(data).toEqual([
 				{
-					species_name: 'Chaffinch',
+					species_name: 'Robin',
 					first_encounter_date: '2080-06-01',
 					is_first_ever: true
 				},
 				{
-					species_name: 'Robin',
+					species_name: 'Chaffinch',
 					first_encounter_date: '2080-06-01',
 					is_first_ever: true
 				}
@@ -170,7 +170,9 @@ describe('group_ticks', () => {
 		expect(data).toEqual([]);
 	});
 
-	it('two species sharing the same first_encounter_date are tie-broken by species_name ASC', async () => {
+	// Seeded first-capture times: Wren 06:55 / Robin 06:00 on 2021-06-20,
+	// Kingfisher 06:50 / Blue Tit 06:35 on 2022-04-30.
+	it('two species first encountered on the same date are ordered by capture_time, latest first', async () => {
 		const { data, error } = await alphaClient.rpc('group_ticks', {
 			ringing_group_filter: alphaId
 		});
@@ -179,15 +181,15 @@ describe('group_ticks', () => {
 			(r) => r.first_encounter_date === '2021-06-20'
 		);
 		expect(tiedAtJune2021.map((r) => r.species_name)).toEqual([
-			'Robin',
-			'Wren'
+			'Wren',
+			'Robin'
 		]);
 		const tiedAtApril2022 = data!.filter(
 			(r) => r.first_encounter_date === '2022-04-30'
 		);
 		expect(tiedAtApril2022.map((r) => r.species_name)).toEqual([
-			'Blue Tit',
-			'Kingfisher'
+			'Kingfisher',
+			'Blue Tit'
 		]);
 	});
 
@@ -258,6 +260,11 @@ describe('group_ticks', () => {
 			expect(error).toBeNull();
 			expect(data).toEqual([
 				{
+					species_name: 'Wren',
+					first_encounter_date: '2024-05-10',
+					is_first_ever: false
+				},
+				{
 					species_name: 'Reed Warbler',
 					first_encounter_date: '2024-05-10',
 					is_first_ever: false
@@ -266,17 +273,12 @@ describe('group_ticks', () => {
 					species_name: 'Robin',
 					first_encounter_date: '2024-05-10',
 					is_first_ever: false
-				},
-				{
-					species_name: 'Wren',
-					first_encounter_date: '2024-05-10',
-					is_first_ever: false
 				}
 			]);
 		});
 
 		it('month_filter without a year returns the first encounter in that calendar month across all years', async () => {
-			// June: Robin/Wren 2021, Blue Tit/Reed Warbler 2022 (Robin's 2022 June
+			// June: Wren/Robin 2021, Blue Tit/Reed Warbler 2022 (Robin's 2022 June
 			// encounter is later than its 2021 one, so 2021 wins).
 			const { data, error } = await fetchScopedTicks({ month_filter: 6 });
 			expect(error).toBeNull();
@@ -285,8 +287,8 @@ describe('group_ticks', () => {
 			).toEqual([
 				['Blue Tit', '2022-06-15'],
 				['Reed Warbler', '2022-06-15'],
-				['Robin', '2021-06-20'],
-				['Wren', '2021-06-20']
+				['Wren', '2021-06-20'],
+				['Robin', '2021-06-20']
 			]);
 		});
 
@@ -301,10 +303,10 @@ describe('group_ticks', () => {
 			expect(
 				data!.map((row) => [row.species_name, row.first_encounter_date])
 			).toEqual([
+				['Wren', '2023-05-12'],
 				['Blue Tit', '2023-05-12'],
 				['Reed Warbler', '2023-05-12'],
 				['Robin', '2023-05-12'],
-				['Wren', '2023-05-12'],
 				['Kingfisher', '2023-05-10']
 			]);
 		});
@@ -332,8 +334,8 @@ describe('group_ticks', () => {
 					data!.map((row) => [row.species_name, row.is_first_ever])
 				).toEqual([
 					['Reed Warbler', true],
-					['Blue Tit', true],
 					['Kingfisher', true],
+					['Blue Tit', true],
 					['Robin', false]
 				]);
 			});
@@ -406,22 +408,22 @@ describe('group_ticks', () => {
 					is_first_ever: true
 				},
 				{
-					species_name: 'Blue Tit',
-					first_encounter_date: '2022-04-30',
-					is_first_ever: true
-				},
-				{
 					species_name: 'Kingfisher',
 					first_encounter_date: '2022-04-30',
 					is_first_ever: true
 				},
 				{
-					species_name: 'Robin',
-					first_encounter_date: '2021-06-20',
+					species_name: 'Blue Tit',
+					first_encounter_date: '2022-04-30',
 					is_first_ever: true
 				},
 				{
 					species_name: 'Wren',
+					first_encounter_date: '2021-06-20',
+					is_first_ever: true
+				},
+				{
+					species_name: 'Robin',
 					first_encounter_date: '2021-06-20',
 					is_first_ever: true
 				}
@@ -457,12 +459,12 @@ describe('group_ticks', () => {
 			expect(error).toBeNull();
 			expect(data).toEqual([
 				{
-					species_name: 'Robin',
+					species_name: 'Wren',
 					first_encounter_date: '2021-06-20',
 					is_first_ever: true
 				},
 				{
-					species_name: 'Wren',
+					species_name: 'Robin',
 					first_encounter_date: '2021-06-20',
 					is_first_ever: true
 				}
@@ -486,12 +488,12 @@ describe('group_ticks', () => {
 					is_first_ever: true
 				},
 				{
-					species_name: 'Robin',
+					species_name: 'Wren',
 					first_encounter_date: '2021-06-20',
 					is_first_ever: true
 				},
 				{
-					species_name: 'Wren',
+					species_name: 'Robin',
 					first_encounter_date: '2021-06-20',
 					is_first_ever: true
 				}

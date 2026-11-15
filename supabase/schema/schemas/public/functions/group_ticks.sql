@@ -16,7 +16,8 @@
 -- exactly the is_first_ever subset of 'scope' mode, so its rows are always
 -- is_first_ever. Both dates come out of one aggregate pass — the in-window MIN
 -- via an aggregate FILTER clause — rather than two grouped CTEs joined back
--- together.
+-- together. The minimums are taken over visit_date + capture_time, so ticks
+-- falling on the same date are ordered by when that first capture happened.
 CREATE FUNCTION public.group_ticks (
 	ringing_group_filter bigint DEFAULT NULL::bigint,
 	location_filter bigint DEFAULT NULL::bigint,
@@ -43,14 +44,14 @@ BEGIN
 	WITH species_firsts AS (
 		SELECT
 			sp.species_name AS species_name,
-			MIN(en.visit_date) FILTER (
+			MIN(en.visit_date + en.capture_time) FILTER (
 				WHERE
 					(from_date IS NULL OR en.visit_date >= from_date) AND
 					(to_date IS NULL OR en.visit_date <= to_date) AND
 					(year_filter IS NULL OR EXTRACT(YEAR FROM en.visit_date) = year_filter) AND
 					(month_filter IS NULL OR EXTRACT(MONTH FROM en.visit_date) = month_filter)
-			) AS period_first_date,
-			MIN(en.visit_date) AS all_time_first_date
+			) AS period_first_timestamp,
+			MIN(en.visit_date + en.capture_time) AS all_time_first_timestamp
 		FROM public."Encounters" en
 			JOIN public."Birds" b ON b.id = en.bird_id
 			JOIN public."Species" sp ON sp.id = b.species_id
@@ -62,13 +63,13 @@ BEGIN
 	)
 	SELECT
 		sf.species_name,
-		sf.period_first_date AS first_encounter_date,
-		sf.period_first_date = sf.all_time_first_date AS is_first_ever
+		sf.period_first_timestamp::date AS first_encounter_date,
+		sf.period_first_timestamp = sf.all_time_first_timestamp AS is_first_ever
 	FROM species_firsts sf
 	WHERE
-		sf.period_first_date IS NOT NULL AND
-		(temporal_filter_mode = 'scope' OR sf.period_first_date = sf.all_time_first_date)
-	ORDER BY sf.period_first_date DESC, sf.species_name ASC
+		sf.period_first_timestamp IS NOT NULL AND
+		(temporal_filter_mode = 'scope' OR sf.period_first_timestamp = sf.all_time_first_timestamp)
+	ORDER BY sf.period_first_timestamp DESC, sf.species_name ASC
 	LIMIT result_limit;
 END;
 $function$;
