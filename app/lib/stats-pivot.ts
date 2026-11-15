@@ -1,0 +1,228 @@
+import type { StatsCacheResult, StatsResult } from '@/modules/stats/browser';
+
+/**
+ * Selection, URL and pivot-grid logic for the `/stats-pivot` page
+ * (`/stats-pivot?species=x&stats=a&stats=b`).
+ */
+
+export type PivotMetricColumn = Exclude<
+	keyof StatsCacheResult,
+	'species_name' | 'time_period'
+>;
+
+export const PIVOT_METRICS: { column: PivotMetricColumn; label: string }[] = [
+	{ column: 'species_count', label: 'Species' },
+	{ column: 'bird_count', label: 'Birds' },
+	{ column: 'encounter_count', label: 'Encounters' },
+	{ column: 'new_bird_count', label: 'New birds' },
+	{ column: 'session_count', label: 'Sessions' },
+	{ column: 'avg_encounters_per_session', label: 'Avg per session' },
+	{ column: 'max_per_session', label: 'Max per session' },
+	{ column: 'max_new_per_session', label: 'Max new per session' },
+	{ column: 'max_weight', label: 'Max weight (g)' },
+	{ column: 'avg_weight', label: 'Avg weight (g)' },
+	{ column: 'min_weight', label: 'Min weight (g)' },
+	{ column: 'median_weight', label: 'Median weight (g)' },
+	{ column: 'max_wing', label: 'Max wing (mm)' },
+	{ column: 'avg_wing', label: 'Avg wing (mm)' },
+	{ column: 'min_wing', label: 'Min wing (mm)' },
+	{ column: 'median_wing', label: 'Median wing (mm)' },
+	{ column: 'pullus_bird_count', label: 'Pulli birds' },
+	{ column: 'juv_bird_count', label: 'Juv birds' },
+	{ column: 'postjuv_bird_count', label: 'Postjuv birds' },
+	{ column: 'adult_bird_count', label: 'Adult birds' },
+	{ column: 'unknown_age_bird_count', label: 'Not aged birds' },
+	{ column: 'new_young_bird_count', label: 'New young birds' },
+	{ column: 'pullus_enc_count', label: 'Pulli encounters' },
+	{ column: 'juv_enc_count', label: 'Juv encounters' },
+	{ column: 'postjuv_enc_count', label: 'Postjuv encounters' },
+	{ column: 'adult_enc_count', label: 'Adult encounters' },
+	{ column: 'unknown_age_enc_count', label: 'Not aged encounters' },
+	{ column: 'postjuv_juv_enc_count', label: 'Postjuv + juv encounters' },
+	{
+		column: 'new_postjuv_juv_enc_count',
+		label: 'New postjuv + juv encounters'
+	},
+	{ column: 'new_postjuv_enc_count', label: 'New postjuv encounters' }
+];
+
+// Literal class strings so Tailwind's scanner picks them up. Pastel in light
+// mode, dark shades in dark mode, so text stays legible on either.
+export const METRIC_COLOURS = [
+	'bg-stone-300 dark:bg-stone-700',
+	'bg-blue-200 dark:bg-blue-800',
+	'bg-red-200 dark:bg-red-800',
+	'bg-green-200 dark:bg-green-800',
+	'bg-amber-200 dark:bg-amber-800',
+	'bg-purple-200 dark:bg-purple-800',
+	'bg-pink-200 dark:bg-pink-800',
+	'bg-teal-200 dark:bg-teal-800'
+];
+
+export type MetricSelection = {
+	column: PivotMetricColumn;
+	colourIndex: number;
+}[];
+
+/**
+ * Deselects a selected metric (leaving every other metric's colour alone), or
+ * selects an unselected one with the lowest colour not already in use. A no-op
+ * once every colour is taken.
+ */
+export function toggleMetricSelection(
+	selection: MetricSelection,
+	column: PivotMetricColumn
+): MetricSelection {
+	if (selection.some((selected) => selected.column === column)) {
+		return selection.filter((selected) => selected.column !== column);
+	}
+	const usedColourIndexes = new Set(
+		selection.map((selected) => selected.colourIndex)
+	);
+	const colourIndex = METRIC_COLOURS.findIndex(
+		(_, index) => !usedColourIndexes.has(index)
+	);
+	if (colourIndex === -1) {
+		return selection;
+	}
+	return [...selection, { column, colourIndex }];
+}
+
+export type PivotSourceRows = {
+	monthRows: StatsResult[];
+	yearRows: StatsResult[];
+	monthSquashedRows: StatsResult[];
+	allTimeRows: StatsResult[];
+};
+
+type MonthSlots = (StatsResult | undefined)[];
+
+export type PivotGridRow = {
+	year: number;
+	months: MonthSlots;
+	total: StatsResult | undefined;
+};
+
+export type PivotGrid = {
+	years: PivotGridRow[];
+	monthTotals: MonthSlots;
+	grandTotal: StatsResult | undefined;
+};
+
+function yearOf(row: StatsResult): number {
+	return parseInt(row.time_period.slice(0, 4));
+}
+
+function monthIndexOf(row: StatsResult): number {
+	return parseInt(row.time_period.slice(5, 7)) - 1;
+}
+
+function slotByMonth(rows: StatsResult[]): MonthSlots {
+	const months: MonthSlots = Array(12).fill(undefined);
+	rows.forEach((row) => {
+		months[monthIndexOf(row)] = row;
+	});
+	return months;
+}
+
+/**
+ * One row per year (latest first), each with a slot per calendar month and
+ * its year-grain total, plus a month-squashed total per calendar month and
+ * the all-time grand total.
+ */
+export function buildPivotGrid({
+	monthRows,
+	yearRows,
+	monthSquashedRows,
+	allTimeRows
+}: PivotSourceRows): PivotGrid {
+	const years = [...new Set([...monthRows, ...yearRows].map(yearOf))].sort(
+		(oneYear, otherYear) => otherYear - oneYear
+	);
+	return {
+		years: years.map((year) => ({
+			year,
+			months: slotByMonth(monthRows.filter((row) => yearOf(row) === year)),
+			total: yearRows.find((row) => yearOf(row) === year)
+		})),
+		monthTotals: slotByMonth(monthSquashedRows),
+		grandTotal: allTimeRows[0]
+	};
+}
+
+export function formatMetricValue(value: number | null | undefined): string {
+	if (value === null || value === undefined) {
+		return '–';
+	}
+	return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+export const SPECIES_QUERY_PARAM = 'species';
+export const STATS_QUERY_PARAM = 'stats';
+
+export type StatsPivotSearchParams = {
+	[SPECIES_QUERY_PARAM]?: string | string[];
+	[STATS_QUERY_PARAM]?: string | string[];
+};
+
+export type StatsPivotParams = {
+	species: string | null;
+	selectedStats: PivotMetricColumn[];
+};
+
+function toNonEmptyList(rawParam: string | string[] | undefined): string[] {
+	const values = rawParam === undefined ? [] : [rawParam].flat();
+	return values.filter((value) => value.length > 0);
+}
+
+function isPivotMetricColumn(value: string): value is PivotMetricColumn {
+	return PIVOT_METRICS.some(({ column }) => column === value);
+}
+
+/**
+ * Normalise `searchParams` into the page's params. Unknown and repeated
+ * `stats` values (stale bookmark, hand-edited URL) are dropped, keeping
+ * first-seen order; only the first `species` value counts.
+ */
+export function parseStatsPivotSearchParams(
+	searchParams: StatsPivotSearchParams
+): StatsPivotParams {
+	return {
+		species: toNonEmptyList(searchParams[SPECIES_QUERY_PARAM])[0] ?? null,
+		selectedStats: [
+			...new Set(
+				toNonEmptyList(searchParams[STATS_QUERY_PARAM]).filter(
+					isPivotMetricColumn
+				)
+			)
+		]
+	};
+}
+
+/** A selection for metrics listed in a URL: colours in listed order. */
+export function seedMetricSelection(
+	columns: PivotMetricColumn[]
+): MetricSelection {
+	return columns.reduce(toggleMetricSelection, [] as MetricSelection);
+}
+
+/**
+ * The inverse of `parseStatsPivotSearchParams` (no leading `?`). Stats are
+ * written in colour order so a reload re-seeds the same colours where it can.
+ */
+export function buildStatsPivotQuery(
+	species: string | null,
+	selection: MetricSelection
+): string {
+	const searchParams = new URLSearchParams();
+	if (species) {
+		searchParams.set(SPECIES_QUERY_PARAM, species);
+	}
+	[...selection]
+		.sort(
+			(oneMetric, otherMetric) =>
+				oneMetric.colourIndex - otherMetric.colourIndex
+		)
+		.forEach(({ column }) => searchParams.append(STATS_QUERY_PARAM, column));
+	return searchParams.toString();
+}

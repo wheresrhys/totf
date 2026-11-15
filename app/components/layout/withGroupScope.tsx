@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug, type ViewedGroup } from '@/app/lib/group-slug';
 import type { TemporalSearchParams } from '@/app/lib/temporal-filter';
+import type { StatsPivotSearchParams } from '@/app/lib/stats-pivot';
 
 // Shared group-scoping wrapper for `/group/[groupSlug]/**` route pages.
 //
@@ -24,7 +25,8 @@ import type { TemporalSearchParams } from '@/app/lib/temporal-filter';
 
 type GroupScopedParams<ExtraParams> = { groupSlug: string } & ExtraParams;
 
-type GroupScopeSearchParams = { tabId?: string } & TemporalSearchParams;
+type GroupScopeSearchParams = { tabId?: string } & TemporalSearchParams &
+	StatsPivotSearchParams;
 
 export type GroupScopeContext<ExtraParams> = {
 	viewedGroup: ViewedGroup;

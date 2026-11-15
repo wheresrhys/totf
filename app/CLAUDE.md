@@ -234,6 +234,9 @@ entrypoint, its content, and its data fetcher:
   re-run the server component and its RPCs to produce byte-identical data. `replaceState` rather
   than `pushState` keeps a run of toggling out of the back button. Reach for `router.replace` only
   when the new URL genuinely needs a different server render.
+  `/stats-pivot` mixes both: its `?stats=` metric selection filters fetched rows (`replaceState`),
+  while its `?species=` filter needs different rows (`router.replace`), carrying the current
+  `?stats=` along so the selection survives the re-render.
   Tab selection follows the same convention and needs no per-page wiring: `useLinkableTabs`
   (`modules/ui-kit/lib/useLinkableTabs.ts`) reads `?tabId=` on load via
   `app/lib/tab-query-param.ts`'s `resolveInitialTabId` and writes the selected tab back via its
