@@ -1,20 +1,20 @@
 import { fetchStatsPivotRows } from '@/app/actions/stats-pivot';
 import { BootstrapPage } from '@/app/components/layout/BootstrapPage';
-import type { StatsCacheResult } from '@/modules/stats/browser';
+import type { PivotSourceRows } from '@/app/lib/stats-pivot';
 import type { ViewedGroup } from '@/app/lib/group-slug';
 import { StatsPivotPageContent } from './PageContent';
 
 type PageProps = Record<string, never>;
 
 export type StatsPivotPageData = {
-	monthRows: StatsCacheResult[];
+	sourceRows: PivotSourceRows;
 };
 
 export async function fetchStatsPivotPageContent(
 	params: Record<string, never>,
 	viewedGroup: ViewedGroup
 ): Promise<StatsPivotPageData> {
-	return { monthRows: await fetchStatsPivotRows(viewedGroup) };
+	return { sourceRows: await fetchStatsPivotRows(viewedGroup) };
 }
 
 export default async function StatsPivotPage(

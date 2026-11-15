@@ -6,6 +6,7 @@ import {
 	PIVOT_METRICS,
 	toggleMetricSelection,
 	type MetricSelection,
+	type PivotSourceRows,
 	type PivotMetricColumn
 } from '../stats-pivot';
 import { buildCoreStatsRow } from '@/app/__tests__/helpers/core-stats-fixtures';
@@ -65,22 +66,72 @@ describe('toggling a metric', () => {
 	});
 });
 
+function buildSourceRows(
+	overrides: Partial<PivotSourceRows> = {}
+): PivotSourceRows {
+	return {
+		monthRows: [],
+		yearRows: [],
+		monthSquashedRows: [],
+		allTimeRows: [],
+		...overrides
+	};
+}
+
 describe('building the pivot grid', () => {
 	it('creates one row per year, latest first', () => {
-		const grid = buildPivotGrid([
-			buildCoreStatsRow({ time_period: '2024-03-01' }),
-			buildCoreStatsRow({ time_period: '2026-01-01' }),
-			buildCoreStatsRow({ time_period: '2024-05-01' })
-		]);
-		expect(grid.map(({ year }) => year)).toEqual([2026, 2024]);
+		const grid = buildPivotGrid(
+			buildSourceRows({
+				monthRows: [
+					buildCoreStatsRow({ time_period: '2024-03-01' }),
+					buildCoreStatsRow({ time_period: '2026-01-01' }),
+					buildCoreStatsRow({ time_period: '2024-05-01' })
+				]
+			})
+		);
+		expect(grid.years.map(({ year }) => year)).toEqual([2026, 2024]);
 	});
 
-	it('places each row under its month, leaving months without data empty', () => {
+	it('places each month row under its month, leaving months without data empty', () => {
 		const marchRow = buildCoreStatsRow({ time_period: '2024-03-01' });
-		const [{ months }] = buildPivotGrid([marchRow]);
+		const {
+			years: [{ months }]
+		} = buildPivotGrid(buildSourceRows({ monthRows: [marchRow] }));
 		expect(months).toHaveLength(12);
 		expect(months[2]).toBe(marchRow);
 		expect(months.filter(Boolean)).toHaveLength(1);
+	});
+
+	describe('totals', () => {
+		it("uses each year's year-grain cell as its row total", () => {
+			const yearRow = buildCoreStatsRow({ time_period: '2024-01-01' });
+			const {
+				years: [{ total }]
+			} = buildPivotGrid(
+				buildSourceRows({
+					monthRows: [buildCoreStatsRow({ time_period: '2024-03-01' })],
+					yearRows: [yearRow]
+				})
+			);
+			expect(total).toBe(yearRow);
+		});
+
+		it('uses the month-squashed cells as the month totals', () => {
+			const squashedMayRow = buildCoreStatsRow({ time_period: '0001-05-01' });
+			const { monthTotals } = buildPivotGrid(
+				buildSourceRows({ monthSquashedRows: [squashedMayRow] })
+			);
+			expect(monthTotals[4]).toBe(squashedMayRow);
+			expect(monthTotals.filter(Boolean)).toHaveLength(1);
+		});
+
+		it('uses the all-time cell as the grand total', () => {
+			const allTimeRow = buildCoreStatsRow({ time_period: '0001-01-01' });
+			const { grandTotal } = buildPivotGrid(
+				buildSourceRows({ allTimeRows: [allTimeRow] })
+			);
+			expect(grandTotal).toBe(allTimeRow);
+		});
 	});
 });
 

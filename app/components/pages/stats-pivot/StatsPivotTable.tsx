@@ -5,7 +5,8 @@ import {
 	buildPivotGrid,
 	formatMetricValue,
 	METRIC_COLOURS,
-	type MetricSelection
+	type MetricSelection,
+	type PivotSourceRows
 } from '@/app/lib/stats-pivot';
 
 const MONTH_LABELS = [
@@ -23,54 +24,94 @@ const MONTH_LABELS = [
 	'Dec'
 ];
 
+function PivotCell({
+	row,
+	metricsInColourOrder,
+	isTotal = false
+}: {
+	row: StatsCacheResult | undefined;
+	metricsInColourOrder: MetricSelection;
+	isTotal?: boolean;
+}) {
+	return (
+		<td className={`whitespace-nowrap ${isTotal ? 'font-semibold' : ''}`}>
+			{row &&
+				metricsInColourOrder.map(({ column, colourIndex }, position) => (
+					<Fragment key={column}>
+						{position > 0 && ' / '}
+						<span
+							data-testid={`pivot-badge-${column}`}
+							className={`badge border-transparent text-base-content ${METRIC_COLOURS[colourIndex]}`}
+						>
+							{formatMetricValue(row[column])}
+						</span>
+					</Fragment>
+				))}
+		</td>
+	);
+}
+
 /**
  * Year × month pivot of the selected metrics: each cell shows one badge per
- * selected metric, in colour order, separated by `/`.
+ * selected metric, in colour order, separated by `/`. The Total column and
+ * row are the year and month-squashed cache cells, not sums of the grid.
  */
 export function StatsPivotTable({
-	rows,
+	sourceRows,
 	selection
 }: {
-	rows: StatsCacheResult[];
+	sourceRows: PivotSourceRows;
 	selection: MetricSelection;
 }) {
 	const metricsInColourOrder = [...selection].sort(
 		(oneMetric, otherMetric) => oneMetric.colourIndex - otherMetric.colourIndex
 	);
+	const { years, monthTotals, grandTotal } = buildPivotGrid(sourceRows);
 	return (
-		<Table testId="stats-pivot-table">
+		<Table testId="stats-pivot-table" className="table table-xs">
 			<thead>
 				<tr>
 					<th>Year</th>
 					{MONTH_LABELS.map((monthLabel) => (
 						<th key={monthLabel}>{monthLabel}</th>
 					))}
+					<th>Total</th>
 				</tr>
 			</thead>
 			<tbody>
-				{buildPivotGrid(rows).map(({ year, months }) => (
+				{years.map(({ year, months, total }) => (
 					<tr key={year}>
 						<td>{year}</td>
 						{months.map((monthRow, monthIndex) => (
-							<td key={monthIndex} className="whitespace-nowrap">
-								{monthRow &&
-									metricsInColourOrder.map(
-										({ column, colourIndex }, position) => (
-											<Fragment key={column}>
-												{position > 0 && ' / '}
-												<span
-													data-testid={`pivot-badge-${column}`}
-													className={`badge border-transparent text-base-content ${METRIC_COLOURS[colourIndex]}`}
-												>
-													{formatMetricValue(monthRow[column])}
-												</span>
-											</Fragment>
-										)
-									)}
-							</td>
+							<PivotCell
+								key={monthIndex}
+								row={monthRow}
+								metricsInColourOrder={metricsInColourOrder}
+							/>
 						))}
+						<PivotCell
+							row={total}
+							metricsInColourOrder={metricsInColourOrder}
+							isTotal
+						/>
 					</tr>
 				))}
+				<tr data-testid="pivot-totals-row" className="font-semibold">
+					<td>Total</td>
+					{monthTotals.map((monthTotalRow, monthIndex) => (
+						<PivotCell
+							key={monthIndex}
+							row={monthTotalRow}
+							metricsInColourOrder={metricsInColourOrder}
+							isTotal
+						/>
+					))}
+					<PivotCell
+						row={grandTotal}
+						metricsInColourOrder={metricsInColourOrder}
+						isTotal
+					/>
+				</tr>
 			</tbody>
 		</Table>
 	);

@@ -33,7 +33,7 @@ export function StatsPivotPageContent({
 				Tap a metric to add it to the table, and tap it again to remove it.
 			</Standfirst>
 			<MetricSelector selection={selection} onToggle={handleMetricToggle} />
-			<StatsPivotTable rows={data.monthRows} selection={selection} />
+			<StatsPivotTable sourceRows={data.sourceRows} selection={selection} />
 		</PageWrapper>
 	);
 }

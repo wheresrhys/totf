@@ -85,25 +85,66 @@ export function toggleMetricSelection(
 	return [...selection, { column, colourIndex }];
 }
 
-export type PivotGridRow = {
-	year: number;
-	months: (StatsCacheResult | undefined)[];
+export type PivotSourceRows = {
+	monthRows: StatsCacheResult[];
+	yearRows: StatsCacheResult[];
+	monthSquashedRows: StatsCacheResult[];
+	allTimeRows: StatsCacheResult[];
 };
 
-/** One row per year (latest first), each with a slot per calendar month. */
-export function buildPivotGrid(rows: StatsCacheResult[]): PivotGridRow[] {
-	const gridRowsByYear = new Map<number, PivotGridRow>();
+type MonthSlots = (StatsCacheResult | undefined)[];
+
+export type PivotGridRow = {
+	year: number;
+	months: MonthSlots;
+	total: StatsCacheResult | undefined;
+};
+
+export type PivotGrid = {
+	years: PivotGridRow[];
+	monthTotals: MonthSlots;
+	grandTotal: StatsCacheResult | undefined;
+};
+
+function yearOf(row: StatsCacheResult): number {
+	return parseInt(row.time_period.slice(0, 4));
+}
+
+function monthIndexOf(row: StatsCacheResult): number {
+	return parseInt(row.time_period.slice(5, 7)) - 1;
+}
+
+function slotByMonth(rows: StatsCacheResult[]): MonthSlots {
+	const months: MonthSlots = Array(12).fill(undefined);
 	rows.forEach((row) => {
-		const year = parseInt(row.time_period.slice(0, 4));
-		const monthIndex = parseInt(row.time_period.slice(5, 7)) - 1;
-		if (!gridRowsByYear.has(year)) {
-			gridRowsByYear.set(year, { year, months: Array(12).fill(undefined) });
-		}
-		gridRowsByYear.get(year)!.months[monthIndex] = row;
+		months[monthIndexOf(row)] = row;
 	});
-	return [...gridRowsByYear.values()].sort(
-		(oneRow, otherRow) => otherRow.year - oneRow.year
+	return months;
+}
+
+/**
+ * One row per year (latest first), each with a slot per calendar month and
+ * its year-grain total, plus a month-squashed total per calendar month and
+ * the all-time grand total.
+ */
+export function buildPivotGrid({
+	monthRows,
+	yearRows,
+	monthSquashedRows,
+	allTimeRows
+}: PivotSourceRows): PivotGrid {
+	const years = [...new Set([...monthRows, ...yearRows].map(yearOf))].sort(
+		(oneYear, otherYear) => otherYear - oneYear
 	);
+	return {
+		years: years.map((year) => ({
+			year,
+			months: slotByMonth(monthRows.filter((row) => yearOf(row) === year)),
+			total: yearRows.find((row) => yearOf(row) === year)
+		})),
+		monthTotals: slotByMonth(monthSquashedRows),
+		grandTotal: allTimeRows[0]
+	};
 }
 
 export function formatMetricValue(value: number | null | undefined): string {

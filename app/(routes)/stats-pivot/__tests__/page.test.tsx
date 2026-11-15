@@ -13,18 +13,32 @@ vi.mock('@/app/actions/stats-pivot', () => ({
 	fetchStatsPivotRows: mockFetchStatsPivotRows
 }));
 
-const monthRows = [
-	buildCoreStatsRow({
-		time_period: '2025-03-01',
-		bird_count: 40,
-		encounter_count: 55
-	}),
-	buildCoreStatsRow({
-		time_period: '2026-01-01',
-		bird_count: 12,
-		encounter_count: 20
-	})
-];
+// Totals deliberately differ from the sum of the month cells: they come from
+// their own cache grains, not from adding the grid up.
+const sourceRows = {
+	monthRows: [
+		buildCoreStatsRow({
+			time_period: '2025-03-01',
+			bird_count: 40,
+			encounter_count: 55
+		}),
+		buildCoreStatsRow({
+			time_period: '2026-01-01',
+			bird_count: 12,
+			encounter_count: 20
+		})
+	],
+	yearRows: [
+		buildCoreStatsRow({ time_period: '2025-01-01', bird_count: 45 }),
+		buildCoreStatsRow({ time_period: '2026-01-01', bird_count: 13 })
+	],
+	monthSquashedRows: [
+		buildCoreStatsRow({ time_period: '0001-03-01', bird_count: 41 })
+	],
+	allTimeRows: [
+		buildCoreStatsRow({ time_period: '0001-01-01', bird_count: 50 })
+	]
+};
 
 async function renderStatsPivotPage() {
 	render(await Page());
@@ -44,7 +58,7 @@ function march2025Cell() {
 }
 
 beforeEach(() => {
-	mockFetchStatsPivotRows.mockResolvedValue(monthRows);
+	mockFetchStatsPivotRows.mockResolvedValue(sourceRows);
 });
 
 afterEach(() => {
@@ -101,12 +115,13 @@ describe('pivot table', () => {
 			'Sep',
 			'Oct',
 			'Nov',
-			'Dec'
+			'Dec',
+			'Total'
 		]);
 		const years = [...table.querySelectorAll('tbody tr')].map(
 			(row) => row.firstElementChild?.textContent
 		);
-		expect(years).toEqual(['2026', '2025']);
+		expect(years).toEqual(['2026', '2025', 'Total']);
 	});
 
 	it('shows a badge in the metric colour for each selected metric, separated by /', async () => {
@@ -127,5 +142,31 @@ describe('pivot table', () => {
 		toggleMetric('Birds');
 		expect(march2025Cell().textContent).toBe('55');
 		expect(metricButton('Encounters').className).toContain(METRIC_COLOURS[1]);
+	});
+
+	it('renders at the extra-small size on every screen width', async () => {
+		await renderStatsPivotPage();
+		expect(screen.getByRole('table').className).toBe('table table-xs');
+	});
+});
+
+describe('totals', () => {
+	beforeEach(async () => {
+		await renderStatsPivotPage();
+		toggleMetric('Birds');
+	});
+
+	it("shows each year's year-grain value in the Total column", () => {
+		expect(getCellByHeading('Total', '2025').textContent).toBe('45');
+	});
+
+	it('shows the month-squashed value in the Total row', () => {
+		const totalsRow = screen.getByTestId('pivot-totals-row');
+		expect(getCellByHeading('Mar', totalsRow).textContent).toBe('41');
+	});
+
+	it('shows the all-time value where the Total row and column meet', () => {
+		const totalsRow = screen.getByTestId('pivot-totals-row');
+		expect(getCellByHeading('Total', totalsRow).textContent).toBe('50');
 	});
 });
