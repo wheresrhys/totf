@@ -1,19 +1,64 @@
-import { GroupTicksResult } from '@/app/models/db';
-import { BoxyList, PageWrapper, PrimaryHeading } from '@/modules/ui-kit';
+import type { ViewedGroup } from '@/app/lib/group-slug';
+import { buildTemporalQueryStrings } from '@/app/lib/temporal-filter';
+import {
+	BoxyList,
+	PageWrapper,
+	PrimaryHeading,
+	TemporalFilterControls
+} from '@/modules/ui-kit';
 import { format as formatDate } from 'date-fns';
+import type { TicksPageData, TicksPageParams } from './page';
 
-export function TicksPageContent({ data }: { data: GroupTicksResult[] }) {
+function buildYearOptions(firstYear: number | null): number[] {
+	if (firstYear === null) {
+		return [];
+	}
+	const currentYear = new Date().getFullYear();
+	return Array.from(
+		{ length: currentYear - firstYear + 1 },
+		(_, index) => firstYear + index
+	);
+}
+
+export function TicksPageContent({
+	params: { selection },
+	data: { ticks, firstYear },
+	viewedGroup
+}: {
+	params: TicksPageParams;
+	data: TicksPageData;
+	viewedGroup: ViewedGroup;
+}) {
+	const isFiltered =
+		Object.keys(buildTemporalQueryStrings(selection)).length > 0;
+	// In the group's first year every tick is a first-ever one, so badging them
+	// would add nothing.
+	const showFirstEverBadges = isFiltered && selection.year !== firstYear;
+
 	return (
 		<PageWrapper>
 			<PrimaryHeading>Ticks</PrimaryHeading>
-			{data.length === 0 ? (
-				<p>No ticks yet.</p>
+			<TemporalFilterControls
+				years={buildYearOptions(firstYear)}
+				baseUrl={`/group/${viewedGroup.slug}/ticks`}
+				initialSelection={selection}
+			/>
+			{ticks.length === 0 ? (
+				<p>{isFiltered ? 'No ticks in this period.' : 'No ticks yet.'}</p>
 			) : (
 				<BoxyList>
-					{data.map((tick) => (
+					{ticks.map((tick) => (
 						<li key={`${tick.species_name}-${tick.first_encounter_date}`}>
 							{tick.species_name} on{' '}
 							{formatDate(new Date(tick.first_encounter_date), 'do MMMM yyyy')}
+							{showFirstEverBadges && tick.is_first_ever ? (
+								<span
+									className="badge badge-warning ml-2"
+									data-testid="first-ever-badge"
+								>
+									first ever
+								</span>
+							) : null}
 						</li>
 					))}
 				</BoxyList>

@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
 	computeEffectiveDateRange,
 	deriveYearMonthDateRange,
-	isMonthSelectedWithoutYear
+	isMonthSelectedWithoutYear,
+	parseTemporalSelection
 } from '../temporal-filter';
 
 describe('deriving a date range from year/month alone', () => {
@@ -157,5 +158,26 @@ describe('spotting a month selected without a year', () => {
 
 	it('is false for a year on its own', () => {
 		expect(isMonthSelectedWithoutYear({ year: 2022 })).toBe(false);
+	});
+});
+
+describe('parsing a selection from URL search params', () => {
+	it('parses year and month as integers', () => {
+		expect(parseTemporalSelection({ year: '2023', month: '5' })).toEqual({
+			year: 2023,
+			month: 5
+		});
+	});
+
+	it('passes fromDate and toDate through as strings', () => {
+		expect(
+			parseTemporalSelection({ fromDate: '2023-01-01', toDate: '2023-06-30' })
+		).toEqual({ fromDate: '2023-01-01', toDate: '2023-06-30' });
+	});
+
+	it('drops absent, blank and non-numeric values', () => {
+		expect(
+			parseTemporalSelection({ year: 'abc', month: '', fromDate: '' })
+		).toEqual({});
 	});
 });
