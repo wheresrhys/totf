@@ -29,6 +29,33 @@ export type TemporalSelection = {
 	toDate?: string;
 };
 
+// The URL search-param form of a selection, as `buildTemporalQueryStrings`
+// writes it and a page's `searchParams` hands it back.
+export type TemporalSearchParams = {
+	year?: string;
+	month?: string;
+	fromDate?: string;
+	toDate?: string;
+};
+
+// Inverse of `buildTemporalQueryStrings`: absent, blank or non-numeric values
+// are dropped rather than carried through as `NaN`/empty strings.
+export function parseTemporalSelection({
+	year,
+	month,
+	fromDate,
+	toDate
+}: TemporalSearchParams): TemporalSelection {
+	const parsedYear = parseInt(year ?? '');
+	const parsedMonth = parseInt(month ?? '');
+	return {
+		...(parsedYear ? { year: parsedYear } : {}),
+		...(parsedMonth ? { month: parsedMonth } : {}),
+		...(fromDate ? { fromDate } : {}),
+		...(toDate ? { toDate } : {})
+	};
+}
+
 // A pair of inclusive `YYYY-MM-DD` bounds. Either side may be absent, meaning
 // "unbounded in that direction".
 //
