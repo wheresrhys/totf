@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { resolveGroupIdBySlug, type ViewedGroup } from '@/app/lib/group-slug';
+import type { TemporalSearchParams } from '@/app/lib/temporal-filter';
 
 // Shared group-scoping wrapper for `/group/[groupSlug]/**` route pages.
 //
@@ -23,10 +24,12 @@ import { resolveGroupIdBySlug, type ViewedGroup } from '@/app/lib/group-slug';
 
 type GroupScopedParams<ExtraParams> = { groupSlug: string } & ExtraParams;
 
+type GroupScopeSearchParams = { tabId?: string } & TemporalSearchParams;
+
 export type GroupScopeContext<ExtraParams> = {
 	viewedGroup: ViewedGroup;
 	params: ExtraParams;
-	searchParams?: Promise<{ tabId?: string }>;
+	searchParams?: Promise<GroupScopeSearchParams>;
 };
 
 /**
@@ -56,7 +59,7 @@ export function withGroupScope<ExtraParams = Record<never, never>>(
 		searchParams
 	}: {
 		params: Promise<GroupScopedParams<ExtraParams>>;
-		searchParams?: Promise<{ tabId?: string }>;
+		searchParams?: Promise<GroupScopeSearchParams>;
 	}) {
 		const { groupSlug, ...extraParams } = await params;
 		const groupId = await resolveGroupIdBySlug(groupSlug);

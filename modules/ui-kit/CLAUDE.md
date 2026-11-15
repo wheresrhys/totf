@@ -52,6 +52,9 @@ modules/ui-kit/
     TabContent.tsx                # TabContent — per-tab fetch/loading/error handling
     TabSet.tsx                    # TabSet — whole page-level tab block: nav + state + content
     TemporalFilterControls.tsx    # TemporalFilterControls — period prev/next/jump navigation
+                                   # (first real consumer: the ticks page, which reads the
+                                   # selection back via app/lib/temporal-filter.ts'
+                                   # parseTemporalSelection)
     useLinkableTabs.ts            # useLinkableTabs — ?tabId= read-on-load/write-on-select hook
   lib/__tests__/                  # colocated tests, one per component file above (7 of the 12
                                    # have one; NoPrefetchLink.tsx, ConditionalTabPanel.tsx,
