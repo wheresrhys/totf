@@ -24,7 +24,11 @@ vi.mock('@/modules/stats', () => ({
 }));
 
 const defaultLastGroupTick: GroupTicksResult[] = [
-	{ species_name: 'Carrion Crow', first_encounter_date: '2026-02-12' }
+	{
+		species_name: 'Carrion Crow',
+		first_encounter_date: '2026-02-12',
+		is_first_ever: true
+	}
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();

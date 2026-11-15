@@ -12,9 +12,21 @@ vi.mock('@/app/lib/auth/group-auth', () => ({
 }));
 
 const ticksSnapshot: GroupTicksResult[] = [
-	{ species_name: 'Carrion Crow', first_encounter_date: '2026-05-02' },
-	{ species_name: 'Robin', first_encounter_date: '2025-11-20' },
-	{ species_name: 'Blue Tit', first_encounter_date: '2024-03-01' }
+	{
+		species_name: 'Carrion Crow',
+		first_encounter_date: '2026-05-02',
+		is_first_ever: true
+	},
+	{
+		species_name: 'Robin',
+		first_encounter_date: '2025-11-20',
+		is_first_ever: true
+	},
+	{
+		species_name: 'Blue Tit',
+		first_encounter_date: '2024-03-01',
+		is_first_ever: true
+	}
 ];
 
 function makeRpcClient(data: unknown) {
