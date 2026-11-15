@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { Table } from '@/modules/ui-kit';
-import type { StatsCacheResult } from '@/modules/stats/browser';
+import type { StatsResult } from '@/modules/stats/browser';
 import {
 	buildPivotGrid,
 	formatMetricValue,
@@ -29,7 +29,7 @@ function PivotCell({
 	metricsInColourOrder,
 	isTotal = false
 }: {
-	row: StatsCacheResult | undefined;
+	row: StatsResult | undefined;
 	metricsInColourOrder: MetricSelection;
 	isTotal?: boolean;
 }) {

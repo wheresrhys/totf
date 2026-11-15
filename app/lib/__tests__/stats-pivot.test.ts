@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
 	buildPivotGrid,
+	buildStatsPivotQuery,
+	parseStatsPivotSearchParams,
+	seedMetricSelection,
 	formatMetricValue,
 	METRIC_COLOURS,
 	PIVOT_METRICS,
@@ -146,5 +149,62 @@ describe('formatting metric values', () => {
 
 	it('shows whole numbers as they are', () => {
 		expect(formatMetricValue(40)).toBe('40');
+	});
+});
+
+describe('reading the URL', () => {
+	it('reads the species', () => {
+		expect(parseStatsPivotSearchParams({ species: 'Robin' }).species).toBe(
+			'Robin'
+		);
+	});
+
+	it('treats a missing or empty species as all species', () => {
+		expect(parseStatsPivotSearchParams({}).species).toBeNull();
+		expect(parseStatsPivotSearchParams({ species: '' }).species).toBeNull();
+	});
+
+	it('accepts a single stats value', () => {
+		expect(
+			parseStatsPivotSearchParams({ stats: 'bird_count' }).selectedStats
+		).toEqual(['bird_count']);
+	});
+
+	it('keeps known stats in order, dropping unknown and repeated ones', () => {
+		expect(
+			parseStatsPivotSearchParams({
+				stats: [
+					'encounter_count',
+					'not_a_column',
+					'bird_count',
+					'encounter_count'
+				]
+			}).selectedStats
+		).toEqual(['encounter_count', 'bird_count']);
+	});
+});
+
+describe('seeding a selection from the URL', () => {
+	it('assigns colours in listed order', () => {
+		expect(seedMetricSelection(['encounter_count', 'bird_count'])).toEqual([
+			{ column: 'encounter_count', colourIndex: 0 },
+			{ column: 'bird_count', colourIndex: 1 }
+		]);
+	});
+});
+
+describe('writing the URL', () => {
+	it('writes the species and the stats in colour order', () => {
+		const selection: MetricSelection = [
+			{ column: 'bird_count', colourIndex: 2 },
+			{ column: 'encounter_count', colourIndex: 0 }
+		];
+		expect(buildStatsPivotQuery('Robin', selection)).toBe(
+			'species=Robin&stats=encounter_count&stats=bird_count'
+		);
+	});
+
+	it('writes nothing for all species and no stats', () => {
+		expect(buildStatsPivotQuery(null, [])).toBe('');
 	});
 });
