@@ -80,10 +80,10 @@ describe('DesktopNavItems', () => {
 describe('MobileNavItems', () => {
 	afterEach(cleanup);
 
-	it('renders all 10 links in a flat list', () => {
+	it('renders all 11 links in a flat list', () => {
 		render(<MobileNavItems classes="" />);
 		const links = screen.getAllByRole('link');
-		expect(links).toHaveLength(10);
+		expect(links).toHaveLength(11);
 	});
 
 	it('includes Resightings link', () => {
@@ -116,6 +116,12 @@ describe('MobileNavItems', () => {
 		render(<MobileNavItems classes="" />);
 		const link = screen.getByRole('link', { name: 'Compare Species' });
 		expect(link.getAttribute('href')).toBe('/compare/species');
+	});
+
+	it('includes Stats Pivot link', () => {
+		render(<MobileNavItems classes="" />);
+		const link = screen.getByRole('link', { name: 'Stats Pivot' });
+		expect(link.getAttribute('href')).toBe('/stats-pivot');
 	});
 
 	it('includes Ring Sequences link', () => {

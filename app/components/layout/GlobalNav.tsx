@@ -24,6 +24,7 @@ const moreLinks = [
 	{ href: '/pulli', label: 'Pulli' },
 	{ href: '/ticks', label: 'Ticks' },
 	{ href: '/compare/species', label: 'Compare Species' },
+	{ href: '/stats-pivot', label: 'Stats Pivot' },
 	{ href: '/ring-sequences', label: 'Ring Sequences' },
 	{ href: '/controls', label: 'Controls' }
 ];
