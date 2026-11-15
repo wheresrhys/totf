@@ -926,11 +926,13 @@ export type Database = {
           month_filter?: number
           result_limit?: number
           ringing_group_filter?: number
+          temporal_filter_mode?: string
           to_date?: string
           year_filter?: number
         }
         Returns: {
           first_encounter_date: string
+          is_first_ever: boolean
           species_name: string
         }[]
       }
