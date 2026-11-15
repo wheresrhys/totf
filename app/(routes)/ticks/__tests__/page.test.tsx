@@ -94,17 +94,17 @@ describe('ticks page', () => {
 		cleanup();
 	});
 
-	it('renders heading', async () => {
+	it('renders a plain "Ticks" heading when unfiltered', async () => {
 		const heading = await renderTicksPage();
 		expect(heading.textContent).toBe('Ticks');
 	});
 
-	it('renders one entry per tick, formatted as "{species} on {date}"', async () => {
+	it('renders one entry per tick, numbered in reverse and formatted as "{n}. {species} on {date}"', async () => {
 		await renderTicksPage();
 		expect(getListItemTexts()).toEqual([
-			'Carrion Crow on 2nd May 2026',
-			'Robin on 20th November 2025',
-			'Blue Tit on 1st March 2024'
+			'3. Carrion Crow on 2nd May 2026',
+			'2. Robin on 20th November 2025',
+			'1. Blue Tit on 1st March 2024'
 		]);
 	});
 
@@ -124,6 +124,11 @@ describe('ticks page', () => {
 				year_filter: 2026,
 				month_filter: 4
 			});
+		});
+
+		it('titles the heading with the selected period, e.g. "Ticks for November 2026"', async () => {
+			const heading = await renderTicksPage({ year: '2026', month: '11' });
+			expect(heading.textContent).toBe('Ticks for November 2026');
 		});
 
 		it("offers every year from the group's first year to the current year", async () => {
@@ -159,8 +164,8 @@ describe('ticks page', () => {
 		it('badges only is_first_ever rows when a non-first year is selected', async () => {
 			await renderTicksPage({ year: '2026' });
 			expect(getListItemTexts()).toEqual([
-				'Carrion Crow on 2nd May 2026first ever',
-				'Blue Tit on 10th April 2026'
+				'2. Carrion Crow on 2nd May 2026first ever',
+				'1. Blue Tit on 10th April 2026'
 			]);
 		});
 

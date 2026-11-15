@@ -5,7 +5,7 @@ import {
 	MONTH_NAMES,
 	buildTemporalHref,
 	buildTemporalQueryStrings,
-	computeEffectiveDateRange,
+	describeTemporalSelection,
 	isMonthSelectedWithoutYear,
 	type TemporalSelection
 } from '@/app/lib/temporal-filter';
@@ -14,41 +14,6 @@ export type TemporalNavigationTarget = {
 	path: string;
 	queryStrings: Record<string, string>;
 };
-
-function describeBounds(fromDate?: string, toDate?: string): string {
-	if (fromDate && toDate) {
-		return `${fromDate} to ${toDate}`;
-	}
-	if (fromDate) {
-		return `${fromDate} onwards`;
-	}
-	if (toDate) {
-		return `up to ${toDate}`;
-	}
-	return 'all dates';
-}
-
-function describeEffectiveDateRange(selection: TemporalSelection): string {
-	const effectiveDateRange = computeEffectiveDateRange(selection);
-	// Nothing satisfies the selection at all — say so outright rather than
-	// printing bounds that would read as a (very small) window of real dates.
-	if (!effectiveDateRange) {
-		return 'no dates';
-	}
-	const { fromDate, toDate, recurringMonth } = effectiveDateRange;
-	if (!recurringMonth) {
-		return describeBounds(fromDate, toDate);
-	}
-	// A month with no year isn't one contiguous stretch — it's that month over
-	// again in each year the bounds span — so it leads the sentence and the
-	// bounds are phrased as the window it recurs within, rather than reading as
-	// an unbroken range with the month tacked on as an aside.
-	const monthName = MONTH_NAMES[recurringMonth - 1];
-	if (!fromDate && !toDate) {
-		return `${monthName} in every year`;
-	}
-	return `${monthName} in every year, ${describeBounds(fromDate, toDate)}`;
-}
 
 // Reusable year / month / date-range filter (#1051). The two filtering modes
 // are never an either/or: whatever is set, the effective range shown is the
@@ -268,7 +233,7 @@ export function TemporalFilterControls({
 				</p>
 			) : (
 				<p className="text-sm" data-testid="effective-date-range">
-					Showing: {describeEffectiveDateRange(selection)}
+					Showing: {describeTemporalSelection(selection)}
 				</p>
 			)}
 		</form>

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	computeEffectiveDateRange,
 	deriveYearMonthDateRange,
+	describeTemporalSelection,
 	isMonthSelectedWithoutYear,
 	parseTemporalSelection
 } from '../temporal-filter';
@@ -144,6 +145,24 @@ describe('computing the effective date range', () => {
 				computeEffectiveDateRange({ month: 5, fromDate: '2021-06-01' })
 			).toEqual({ recurringMonth: 5, fromDate: '2021-06-01' });
 		});
+	});
+});
+
+describe('describing a selection in words', () => {
+	it('names just the year for a year-only selection', () => {
+		expect(describeTemporalSelection({ year: 2026 })).toBe('2026');
+	});
+
+	it('names the month and year for a year-and-month selection', () => {
+		expect(describeTemporalSelection({ year: 2026, month: 11 })).toBe(
+			'November 2026'
+		);
+	});
+
+	it('falls back to the date bounds once an explicit date is set alongside a year', () => {
+		expect(
+			describeTemporalSelection({ year: 2026, fromDate: '2026-03-15' })
+		).toBe('2026-03-15 to 2026-12-31');
 	});
 });
 

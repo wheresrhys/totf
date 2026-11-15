@@ -1,5 +1,8 @@
 import type { ViewedGroup } from '@/app/lib/group-slug';
-import { buildTemporalQueryStrings } from '@/app/lib/temporal-filter';
+import {
+	buildTemporalQueryStrings,
+	describeTemporalSelection
+} from '@/app/lib/temporal-filter';
 import {
 	BoxyList,
 	PageWrapper,
@@ -37,19 +40,26 @@ export function TicksPageContent({
 
 	return (
 		<PageWrapper>
-			<PrimaryHeading>Ticks</PrimaryHeading>
-			<TemporalFilterControls
-				years={buildYearOptions(firstYear)}
-				baseUrl={`/group/${viewedGroup.slug}/ticks`}
-				initialSelection={selection}
-			/>
+			<PrimaryHeading>
+				{isFiltered
+					? `Ticks for ${describeTemporalSelection(selection)}`
+					: 'Ticks'}
+			</PrimaryHeading>
+			<div className="mb-2">
+				<TemporalFilterControls
+					years={buildYearOptions(firstYear)}
+					baseUrl={`/group/${viewedGroup.slug}/ticks`}
+					initialSelection={selection}
+				/>
+			</div>
 			{ticks.length === 0 ? (
 				<p>{isFiltered ? 'No ticks in this period.' : 'No ticks yet.'}</p>
 			) : (
 				<BoxyList>
-					{ticks.map((tick) => (
+					{ticks.map((tick, index) => (
 						<li key={`${tick.species_name}-${tick.first_encounter_date}`}>
-							{tick.species_name} on{' '}
+							{/* Numbered in reverse so the oldest tick is 1 and the count reads at the top. */}
+							{ticks.length - index}. {tick.species_name} on{' '}
 							{formatDate(new Date(tick.first_encounter_date), 'do MMMM yyyy')}
 							{showFirstEverBadges && tick.is_first_ever ? (
 								<span

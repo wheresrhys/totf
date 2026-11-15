@@ -191,6 +191,54 @@ export function computeEffectiveDateRange(
 	};
 }
 
+function describeBounds(fromDate?: string, toDate?: string): string {
+	if (fromDate && toDate) {
+		return `${fromDate} to ${toDate}`;
+	}
+	if (fromDate) {
+		return `${fromDate} onwards`;
+	}
+	if (toDate) {
+		return `up to ${toDate}`;
+	}
+	return 'all dates';
+}
+
+// Human-readable summary of a selection's effective range — shared by
+// `TemporalFilterControls`' "Showing:" line and page headings, so the two
+// always describe a period the same way.
+export function describeTemporalSelection(
+	selection: TemporalSelection
+): string {
+	const { year, month, fromDate, toDate } = selection;
+	// A plain year or year+month reads better by name than as its bounds.
+	if (year && !fromDate && !toDate) {
+		return month ? `${MONTH_NAMES[month - 1]} ${year}` : String(year);
+	}
+	const effectiveDateRange = computeEffectiveDateRange(selection);
+	// Nothing satisfies the selection at all — say so outright rather than
+	// printing bounds that would read as a (very small) window of real dates.
+	if (!effectiveDateRange) {
+		return 'no dates';
+	}
+	const { recurringMonth } = effectiveDateRange;
+	if (!recurringMonth) {
+		return describeBounds(
+			effectiveDateRange.fromDate,
+			effectiveDateRange.toDate
+		);
+	}
+	// A month with no year isn't one contiguous stretch — it's that month over
+	// again in each year the bounds span — so it leads the sentence and the
+	// bounds are phrased as the window it recurs within, rather than reading as
+	// an unbroken range with the month tacked on as an aside.
+	const monthName = MONTH_NAMES[recurringMonth - 1];
+	if (!effectiveDateRange.fromDate && !effectiveDateRange.toDate) {
+		return `${monthName} in every year`;
+	}
+	return `${monthName} in every year, ${describeBounds(effectiveDateRange.fromDate, effectiveDateRange.toDate)}`;
+}
+
 // A month selected with no year is a recurring selection rather than a single
 // window (see `deriveYearMonthDateRange`). A caller whose data model can't
 // express that — a page keyed on one concrete year, say — opts out by treating
